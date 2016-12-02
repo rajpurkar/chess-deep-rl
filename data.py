@@ -8,6 +8,7 @@ import numpy as np
 NUM_PIECES = len(chess.PIECE_TYPES)
 NUM_COLORS = len(chess.COLORS)
 NUM_SQUARES = len(chess.SQUARE_NAMES)
+NUM_COLS = 8
 
 class Dataset():
     def __init__(self, filename):
@@ -18,7 +19,10 @@ class Dataset():
         Returns (state, reward) tuple from white's perspective
         - state: np.array [12 pieces x 64 squares]
             - piece order:  wp wn wb wr wq wk bp bn bb br bq bk
-            - square order: a1 a2 a3 ... h8
+            - square order: a1 b1 c1 ... h8
+        - action: index in array [7 pieces x 64 squares x 64 squares]
+            - action_array[ind2sub(action)]: move piece at square j to square k and promote to piece type i
+            - promotion piece order: None p n b r q k
         - result: {-1, 0, 1} (lose, draw, win)
         """
         with open(self.filename) as pgn:
@@ -37,6 +41,11 @@ class Dataset():
                 for i in range(idx_move):
                     board.push(node.variations[0].move)
                     node = node.variations[0]
+                move = node.variations[0].move
+                promotion = move.promotion
+                if promotion is None:
+                    promotion = 0
+                action = promotion * NUM_SQUARES * NUM_SQUARES + move.from_square * NUM_SQUARES + move.to_square
 
                 # headers["Result"]: {"0-1", "1-0", "1/2-1/2"}
                 # result: {-1, 0, 1}
@@ -57,4 +66,4 @@ class Dataset():
                             elif piece == '1':
                                 state[(1-color)*NUM_PIECES + piece_type - 1, i] = 1
 
-                yield state, result
+                yield state, action, result
