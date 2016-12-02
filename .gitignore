@@ -87,3 +87,10 @@ ENV/
 
 # Rope project settings
 .ropeproject
+
+# Mac
+.DS_Store
+
+# Large datasets
+CCRL-4040.\[671444\].pgn
+ficsgamesdb_1999-2015_standard2000_nomovetimes.pgn
