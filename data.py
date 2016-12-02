@@ -1,6 +1,5 @@
 import sys
 import random
-sys.path.append("lib/python-chess-0.15.4")
 import chess
 import chess.pgn
 import numpy as np
@@ -26,7 +25,7 @@ class Dataset():
                 game = chess.pgn.read_game(pgn)
                 if game is None:
                     break
-                
+
                 num_moves = int(game.headers["PlyCount"])
                 # Choose a random white-turn state
                 idx_move = random.randint(1, int(num_moves / 2)) * 2
