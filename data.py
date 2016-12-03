@@ -9,7 +9,7 @@ NUM_COLORS = len(chess.COLORS)
 NUM_SQUARES = len(chess.SQUARE_NAMES)
 NUM_COLS = 8
 
-class Dataset():
+class Dataset:
     def __init__(self, filename):
         self.filename = filename
 
