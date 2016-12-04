@@ -109,7 +109,7 @@ class Dataset:
                 else:
                     result = 0
 
-                state = np.zeros((NUM_COLORS * NUM_PIECES, NUM_ROWS, NUM_COLS))
+                state = np.zeros((1, NUM_COLORS * NUM_PIECES, NUM_ROWS, NUM_COLS))
                 for piece_type in chess.PIECE_TYPES:
                     for color in chess.COLORS:
                         pieces = bin(board.pieces(piece_type, color))
@@ -119,6 +119,6 @@ class Dataset:
                             elif piece == '1':
                                 row = i // NUM_ROWS
                                 col = i % NUM_ROWS
-                                state[(1-color)*NUM_PIECES + piece_type - 1, row, col] = 1
+                                state[0, (1-color)*NUM_PIECES + piece_type - 1, row, col] = 1
 
                 yield state, (GAMMA ** moves_remaining) * result
