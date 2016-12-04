@@ -25,23 +25,12 @@ def value_network(params):
         border_mode='same', bias=True)
     )
     model.add(Flatten())
-    model.add(Dense(1))
+    model.add(Dense(1, init='uniform', activation="tanh"))
     model.compile('adam', 'mse')
     return model
 
 if __name__ == '__main__':
     d = Dataset('data/medium.pgn')
-    X = []
-    y = []
-    count = 0
-    gamma = 0.99
-    for (s, r, moves_remaining) in tqdm(d.random_black_state()):
-        X.append(s)
-        y_single = (0.99 ** moves_remaining) * r
-        y.append(y_single)
-        count += 1
-        if (count == 10000):
-            break
     model = value_network({"board_depth": 12, "board": 8})
-    X = np.array(X)
-    model.fit(X, y)
+    model.fit_generator(d.random_black_state(), 100, 70)
+    model.fit_generator(d.random_black_state(), 100, 70)
