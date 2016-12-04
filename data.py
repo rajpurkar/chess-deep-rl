@@ -85,6 +85,8 @@ class Dataset:
                     break
 
                 num_moves = int(game.headers["PlyCount"])
+                if num_moves < 2:
+                    continue
                 # Choose a random black-turn state
                 idx_move = random.randint(1, int(num_moves / 2)) * 2 - 1
                 moves_remaining = num_moves - idx_move
