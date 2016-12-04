@@ -12,10 +12,10 @@ command_w.result()
 command_b.result()
 
 # Create new game
-command_w = engine_w.ucinewgame(async_callback=True)
-command_b = engine_b.ucinewgame(async_callback=True)
-command_w.result()
-command_b.result()
+# command_w = engine_w.ucinewgame(async_callback=True)
+# command_b = engine_b.ucinewgame(async_callback=True)
+# command_w.result()
+# command_b.result()
 board = chess.Board()
 
 while True:
