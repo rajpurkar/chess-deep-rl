@@ -121,4 +121,4 @@ class Dataset:
                                 col = i % NUM_ROWS
                                 state[0, (1-color)*NUM_PIECES + piece_type - 1, row, col] = 1
 
-                yield state, (GAMMA ** moves_remaining) * result
+                yield state, np.array([(GAMMA ** moves_remaining) * result])
