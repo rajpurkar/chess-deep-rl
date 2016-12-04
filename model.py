@@ -26,6 +26,9 @@ def value_network(params):
     return model
 
 if __name__ == '__main__':
+    d = Dataset()
+    while True:
+        (s, r, moves_remaining) = d.random_black_state()
     # X, y = get_data()
     model = value_network({"board_depth": 1, "board": 8}) 
     # model.fit(X, y)
