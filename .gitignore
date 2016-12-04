@@ -96,3 +96,4 @@ CCRL-4040.\[671444\].pgn
 ficsgamesdb_1999-2015_standard2000_nomovetimes.pgn
 
 engines/stockfish
+*.npy
