@@ -27,12 +27,12 @@ def state_from_board(board):
     return state
 
 class Dataset:
-    def __init__(self, filename, test_set=False):
+    def __init__(self, filename, loop=False):
         self.filename = filename
-        self.test_set = test_set
+        self.loop = loop
         self.idx_game = 0
-        self.idx_moves = []
         self.num_games = 0
+        # self.idx_moves = []
 
     def random_white_state(self):
         """
@@ -88,6 +88,22 @@ class Dataset:
 
                 yield state, action, result
 
+    def pickle(self):
+        X = []
+        y = []
+        for state, reward in self.random_black_state():
+            X.append(state)
+            y.append(reward)
+        X = np.array(X)
+        y = np.array(y)
+        np.save(self.filename + ".X.npy", X)
+        np.save(self.filename + ".y.npy", y)
+
+    def unpickle(self):
+        X = np.load(self.filename + ".X.npy")
+        y = np.load(self.filename + ".y.npy")
+        return X, y
+
     def random_black_state(self):
         """
         Returns (state, reward) tuple at black's turn from white's perspective
@@ -101,6 +117,8 @@ class Dataset:
             while True:
                 game = chess.pgn.read_game(pgn)
                 if game is None:
+                    if not self.loop:
+                        break
                     pgn.seek(0)
                     self.num_games = self.idx_game
                     self.idx_game = 0
@@ -111,14 +129,15 @@ class Dataset:
                     continue
 
                 # Choose a random black-turn state
-                if self.test_set:
-                    if self.num_games:
-                        idx_move = self.idx_moves[self.idx_game]
-                    else:
-                        idx_move = random.randint(1, num_moves // 2) * 2 - 1
-                        self.idx_moves.append(idx_move)
-                else:
-                    idx_move = random.randint(1, num_moves // 2) * 2 - 1
+                # if self.test_set:
+                #     if self.num_games:
+                #         idx_move = self.idx_moves[self.idx_game]
+                #     else:
+                #         idx_move = random.randint(1, num_moves // 2) * 2 - 1
+                #         self.idx_moves.append(idx_move)
+                # else:
+                #     idx_move = random.randint(1, num_moves // 2) * 2 - 1
+                idx_move = random.randint(1, num_moves // 2) * 2 - 1
                 moves_remaining = num_moves - idx_move
 
                 # Play moves up to idx_move
@@ -141,7 +160,6 @@ class Dataset:
                 reward = np.array([(GAMMA ** moves_remaining) * result])
 
                 self.idx_game += 1
-                print(idx_move)
                 yield state, reward
 
     # def load_games(self):
