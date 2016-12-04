@@ -10,6 +10,8 @@ NUM_SQUARES = len(chess.SQUARE_NAMES)
 NUM_COLS = 8
 NUM_ROWS = 8
 
+GAMMA = 0.99
+
 class Dataset:
     def __init__(self, filename):
         self.filename = filename
@@ -119,4 +121,4 @@ class Dataset:
                                 col = i % NUM_ROWS
                                 state[(1-color)*NUM_PIECES + piece_type - 1, row, col] = 1
 
-                yield state, result, moves_remaining
+                yield state, (GAMMA ** moves_remaining) * result
