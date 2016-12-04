@@ -87,6 +87,7 @@ class Dataset:
                 num_moves = int(game.headers["PlyCount"])
                 # Choose a random black-turn state
                 idx_move = random.randint(1, int(num_moves / 2)) * 2 - 1
+                moves_remaining = num_moves - idx_move
 
                 # Play moves up to idx_move
                 board = game.board()
@@ -104,7 +105,7 @@ class Dataset:
                 else:
                     result = 0
 
-                state = np.zeros((NUM_COLORS, NUM_PIECES, NUM_SQUARES))
+                state = np.zeros((NUM_COLORS * NUM_PIECES, NUM_ROWS, NUM_COLS))
                 for piece_type in chess.PIECE_TYPES:
                     for color in chess.COLORS:
                         pieces = bin(board.pieces(piece_type, color))
@@ -112,7 +113,7 @@ class Dataset:
                             if piece == 'b':
                                 break
                             elif piece == '1':
-                                row = i / NUM_ROWS
+                                row = i // NUM_ROWS
                                 col = i % NUM_ROWS
                                 state[(1-color)*NUM_PIECES + piece_type - 1, row, col] = 1
 
