@@ -34,6 +34,30 @@ class Dataset:
         self.num_games = 0
         # self.idx_moves = []
 
+    def load(self):
+        try:
+            X_y = self.unpickle()
+        except:
+            X_y = self.pickle()
+        return X_y
+
+    def pickle(self):
+        X = []
+        y = []
+        for state, reward in self.random_black_state():
+            X.append(np.squeeze(state))
+            y.append(reward)
+        X = np.array(X)
+        y = np.array(y)
+        np.save(self.filename + ".X.npy", X)
+        np.save(self.filename + ".y.npy", y)
+        return X, y
+
+    def unpickle(self):
+        X = np.load(self.filename + ".X.npy")
+        y = np.load(self.filename + ".y.npy")
+        return X, y
+
     def random_white_state(self):
         """
         Returns (state, action, reward) tuple from white's perspective
@@ -87,22 +111,6 @@ class Dataset:
                                 state[(1-color)*NUM_PIECES + piece_type - 1, i] = 1
 
                 yield state, action, result
-
-    def pickle(self):
-        X = []
-        y = []
-        for state, reward in self.random_black_state():
-            X.append(np.squeeze(state))
-            y.append(reward)
-        X = np.array(X)
-        y = np.array(y)
-        np.save(self.filename + ".X.npy", X)
-        np.save(self.filename + ".y.npy", y)
-
-    def unpickle(self):
-        X = np.load(self.filename + ".X.npy")
-        y = np.load(self.filename + ".y.npy")
-        return X, y
 
     def random_black_state(self):
         """
