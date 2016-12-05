@@ -2,14 +2,16 @@ import chess
 import chess.uci
 
 # Load engines
-engine_w = chess.uci.popen_engine("engines/ChessEngine.py")
+engine_w = chess.uci.popen_engine("engines/ValueBaselineEngine.py")
 engine_b = chess.uci.popen_engine("engines/stockfish")
+print("Loaded engines")
 
 # Initialize engines
 command_w = engine_w.uci(async_callback=True)
 command_b = engine_b.uci(async_callback=True)
 command_w.result()
 command_b.result()
+print("Initialized engines")
 
 # Create new game
 # command_w = engine_w.ucinewgame(async_callback=True)
@@ -28,7 +30,7 @@ while True:
         print("\n\nBlack wins!")
         break
     board.push(move)
-    print(move, end=" ", flush=True)
+    # print(move, end=" ", flush=True)
 
     # Play black
     command_b = engine_b.position(board, async_callback=True)
@@ -39,6 +41,7 @@ while True:
         print("\n\nWhite wins!")
         break
     board.push(move)
-    print(move, end=" ", flush=True)
+    print(move, end="\n", flush=True)
+    print(board)
 
 print(board)
