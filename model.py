@@ -6,6 +6,11 @@ import time
 # from tqdm import tqdm
 from data import Dataset
 
+FOLDER_TO_SAVE = "./saved/"
+NUMBER_EPOCHS = 10000  # some large number
+SAMPLES_PER_EPOCH = 1000  # tune for feedback/speed balance
+VERBOSE_LEVEL = 2
+
 
 def value_network(**kwargs):
     """ Use a variation of the ROCAlphaGo Value Network. """
@@ -21,8 +26,8 @@ def value_network(**kwargs):
     conv_input = Input(shape=(
         params["board_depth"],
         params["board"],
-        params["board"])
-    )
+        params["board"]))
+
     conv_start = conv_input
     for i in range(0, params["layers"]):
         # use filter_width_K if it is there, otherwise use 3
@@ -43,8 +48,7 @@ def value_network(**kwargs):
         nb_col=1,
         init='uniform',
         border_mode='same',
-        bias=True
-    )(conv_input)
+        bias=True)(conv_input)
 
     flattened = Flatten()(one_channel_conv)
     densed = Dense(256, init='uniform', activation='relu')(flattened)
@@ -55,15 +59,28 @@ def value_network(**kwargs):
 
 
 def get_filename_for_saving(start_time):
-    FOLDER_TO_SAVE = "./saved/"
-    return FOLDER_TO_SAVE + str(start_time) + "-{epoch:02d}-{val_loss:.2f}.hdf5"
+    return FOLDER_TO_SAVE + str(start_time) + \
+        "-{epoch:02d}-{val_loss:.2f}.hdf5"
 
-if __name__ == '__main__':
+
+def train():
     d = Dataset('data/medium.pgn')
     d_test = Dataset('data/medium_test.pgn')
     d_test.pickle()
     start_time = int(time.time())
     (X_test, y_test) = d_test.unpickle()
     model = value_network()
-    checkpointer = ModelCheckpoint(filepath=get_filename_for_saving(start_time), verbose=1, save_best_only=False)
-    model.fit_generator(d.random_black_state(), 1000, 70,  callbacks=[checkpointer], validation_data=(X_test, y_test))
+    checkpointer = ModelCheckpoint(
+        filepath=get_filename_for_saving(start_time),
+        verbose=VERBOSE_LEVEL,
+        save_best_only=True)
+    model.fit_generator(
+        d.random_black_state(),
+        samples_per_epoch=SAMPLES_PER_EPOCH,
+        nb_epoch=NUMBER_EPOCHS,
+        callbacks=[checkpointer],
+        validation_data=(X_test, y_test),
+        verbose=VERBOSE_LEVEL)
+
+if __name__ == '__main__':
+    train()
