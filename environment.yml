@@ -16,7 +16,11 @@ dependencies:
 - xz=5.2.2=0
 - zlib=1.2.8=3
 - pip:
+  - h5py==2.6.0
   - keras==1.1.2
+  - protobuf==3.1.0
   - python-chess==0.15.4
   - pyyaml==3.12
+  - tensorflow==0.12.0rc0
+  - tqdm==4.10.0
 
