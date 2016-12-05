@@ -1,7 +1,8 @@
 from keras.callbacks import ModelCheckpoint
-from keras.models import Sequential
-from keras.layers import convolutional
-from keras.layers.core import Flatten, Dense
+from keras.layers.convolutional import Convolution2D
+from keras.layers import Input, Dense, Flatten
+from keras.models import Model
+import time
 # from tqdm import tqdm
 from data import Dataset
 
@@ -17,42 +18,52 @@ def value_network(**kwargs):
     params = defaults
     params.update(kwargs)
 
-    model = Sequential()
-    model.add(convolutional.Convolution2D(
-        input_shape=(params["board_depth"], params["board"], params["board"]),
-        nb_filter=params["num_filters"], nb_row=3, nb_col=3,
-        init='uniform', activation='relu', border_mode='same')
+    conv_input = Input(shape=(
+        params["board_depth"],
+        params["board"],
+        params["board"])
     )
-    for i in range(2, params["layers"] + 1):
+    conv_start = conv_input
+    for i in range(0, params["layers"]):
         # use filter_width_K if it is there, otherwise use 3
         filter_key = "filter_width_%d" % i
         filter_width = params.get(filter_key, 3)
-        model.add(convolutional.Convolution2D(
+        conv_start = Convolution2D(
             nb_filter=params["num_filters"],
             nb_row=filter_width,
             nb_col=filter_width,
             init='uniform',
             activation='relu',
-            border_mode='same'))
+            border_mode='same')(conv_start)
 
     # the last layer maps each <filters_per_layer> feature to a number
-    model.add(convolutional.Convolution2D(
+    one_channel_conv = Convolution2D(
         nb_filter=1,
         nb_row=1,
         nb_col=1,
         init='uniform',
-        border_mode='same', bias=True)
-    )
-    model.add(Flatten())
-    model.add(Dense(256, init='uniform', activation='relu'))
-    model.add(Dense(1, init='uniform', activation="tanh"))
-    model.compile('adam', 'mse')
+        border_mode='same',
+        bias=True
+    )(conv_input)
+
+    flattened = Flatten()(one_channel_conv)
+    densed = Dense(256, init='uniform', activation='relu')(flattened)
+    output = Dense(1, init='uniform', activation="tanh")(densed)
+    model = Model(conv_input, output)
+    model.compile('adamax', 'mse')
     return model
+
+
+def get_filename_for_saving(start_time):
+    FOLDER_TO_SAVE = "./saved/"
+    return FOLDER_TO_SAVE + str(start_time) + "-{epoch:02d}-{val_loss:.2f}.hdf5"
 
 if __name__ == '__main__':
     d = Dataset('data/medium.pgn')
-    d_test = Dataset('data/medium_test.pgn', test_set=True)
+    d_test = Dataset('data/medium_test.pgn')
+    d_test.pickle()
+    start_time = int(time.time())
+    (X_test, y_test) = d_test.unpickle()
     model = value_network()
-    checkpointer = ModelCheckpoint(filepath="./saved/weights.{epoch:02d}-{val_loss:.2f}.hdf5", verbose=1, save_best_only=False)
-    model.fit_generator(d.random_black_state(), 1000, 70,  callbacks=[checkpointer], validation_data=d_test.random_black_state(), nb_val_samples=100)
-        # validation_data=test_data, nb_worker=8, pickle_safe=True)
+    checkpointer = ModelCheckpoint(filepath=get_filename_for_saving(start_time), verbose=1, save_best_only=False)
+    model.fit_generator(d.random_black_state(), 1000, 70,  callbacks=[checkpointer], validation_data=(X_test, y_test))
