@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 import chess
 import sys
+import os
+import traceback
 from concurrent import futures
 
 class ChessEngine:
@@ -8,7 +10,7 @@ class ChessEngine:
         self.engine_name = "Dummy Chess Engine"
         self.author = "P. Rajpurkar & T. Migimatsu"
         self.board = chess.Board()
-        self.thread_pool = futures.ThreadPoolExecutor(max_workers=1)
+        self.thread_pool = futures.ThreadPoolExecutor(max_workers=2)
 
     ###################
     # Virtual methods #
@@ -61,12 +63,14 @@ class ChessEngine:
 
     def position(self, input_tokens):
         # Play through last two moves on internal board, regardless of given position
-        # TODO: Potential for error
-        if input_tokens[0] == "startpos" and input_tokens[1] == "moves":
-            moves = input_tokens[2:]
-        elif input_tokens[0] == "fen" and input_tokens[2] == "moves":
-            moves = input_tokens[3:]
-        else:
+        try:
+            if input_tokens[0] == "startpos" and input_tokens[1] == "moves":
+                moves = input_tokens[2:]
+            elif input_tokens[0] == "fen" and input_tokens[2] == "moves":
+                moves = input_tokens[3:]
+            else:
+                return
+        except:
             return
 
         if len(moves) == 1:
@@ -129,27 +133,34 @@ class ChessEngine:
                 return
 
     def handle_msg(self, input_msg):
-        if input_msg.startswith("setoption"):
-            self.setoption(input_msg.split(' ')[1:])
-        elif input_msg.startswith("position"):
-            self.position(input_msg.split(' ')[1:])
-        elif input_msg == "go":
-            self.go()
-        elif input_msg.startswith("go"):
-            self.go(input_msg.split(' ')[1:])
-        elif input_msg == "stop":
-            self.stop()
-            self.send_move()
-        elif input_msg == "uci":
-            self.uci()
-        elif input_msg == "ucinewgame":
-            self.ucinewgame()
-        elif input_msg == "isready":
-            self.isready()
-        elif input_msg == "print":
-            print(self)
-        elif input_msg == "quit":
-            self.exit()
+        try:
+            if input_msg.startswith("setoption"):
+                self.setoption(input_msg.split(' ')[1:])
+            elif input_msg.startswith("position"):
+                self.position(input_msg.split(' ')[1:])
+            elif input_msg == "go":
+                self.go()
+            elif input_msg.startswith("go"):
+                self.go(input_msg.split(' ')[1:])
+            elif input_msg == "stop":
+                self.stop()
+                self.send_move()
+            elif input_msg == "uci":
+                self.uci()
+            elif input_msg == "ucinewgame":
+                self.ucinewgame()
+            elif input_msg == "isready":
+                self.isready()
+            elif input_msg == "print":
+                print(self)
+            elif input_msg == "quit":
+                self.exit()
+        except:
+            print("\n*** Exception from ChessEngine.thread_pool *** {\n", file=sys.stderr)
+            print(traceback.print_exc())
+            print("\n}\n", file=sys.stderr)
+            os._exit(1)
+
         sys.stdout.flush()
 
     def exit(self):

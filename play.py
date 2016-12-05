@@ -3,6 +3,7 @@ import chess.uci
 
 # Load engines
 engine_w = chess.uci.popen_engine("engines/ValueBaselineEngine.py")
+# engine_w = chess.uci.popen_engine("engines/ChessEngine.py")
 engine_b = chess.uci.popen_engine("engines/stockfish")
 print("Loaded engines")
 
@@ -27,10 +28,10 @@ while True:
     command_w = engine_w.go(movetime=20, async_callback=True)
     move = command_w.result().bestmove
     if move is None:
-        print("\n\nBlack wins!")
+        print("\nBlack wins!")
         break
     board.push(move)
-    # print(move, end=" ", flush=True)
+    print(move, end=" ", flush=True)
 
     # Play black
     command_b = engine_b.position(board, async_callback=True)
@@ -38,10 +39,9 @@ while True:
     command_b = engine_b.go(movetime=20, async_callback=True)
     move = command_b.result().bestmove
     if move is None:
-        print("\n\nWhite wins!")
+        print("\nWhite wins!")
         break
     board.push(move)
     print(move, end="\n", flush=True)
-    print(board)
 
 print(board)
