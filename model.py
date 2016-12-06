@@ -79,15 +79,15 @@ def get_filename_for_saving(net_type, start_time):
 
 def train(net_type):
     d = Dataset('data/medium.pgn')
-    d_test = Dataset('data/medium_test.pgn')
-    d_test.pickle()
     start_time = str(int(time.time()))
-    (X_test, y_test) = d_test.unpickle()
     checkpointer = ModelCheckpoint(
         filepath=get_filename_for_saving(net_type, start_time),
         verbose=VERBOSE_LEVEL,
         save_best_only=True)
     if net_type == "value":
+        d_test = Dataset('data/medium_test.pgn')
+        d_test.pickle()
+        (X_test, y_test) = d_test.unpickle()
         model = value_network()
         model.fit_generator(
             d.random_black_state(),
@@ -103,7 +103,6 @@ def train(net_type):
             samples_per_epoch=SAMPLES_PER_EPOCH,
             nb_epoch=NUMBER_EPOCHS,
             callbacks=[checkpointer],
-            validation_data=(X_test, y_test),
             verbose=VERBOSE_LEVEL)
 
 if __name__ == '__main__':
