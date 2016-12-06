@@ -86,7 +86,17 @@ class Dataset:
                 if idx_move >= num_moves or num_moves <= 4:
                     game = chess.pgn.read_game(pgn)
                     if game is None:
+                        # EOF
                         break
+
+                    # Make sure game was played all the way through
+                    last_node = game.root()
+                    while last_node.variations:
+                        last_node = last_node.variations[0]
+                    if "forfeit" in last_node.comment:
+                        continue
+
+                    # Setup game and make sure it has enough moves
                     idx_move = 0
                     num_moves = int(game.headers["PlyCount"])
                     board = game.board()
@@ -126,6 +136,7 @@ class Dataset:
                             r = 2 * int(white_score[0]) - 1
                 except:
                     print("ERROR: ", s, a, r, s_prime, a_prime, game, idx_move, num_moves)
+                    idx_move = num_moves
                     continue
 
                 yield s, a, r, s_prime, a_prime, new_game
