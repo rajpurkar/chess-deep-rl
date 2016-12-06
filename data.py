@@ -12,33 +12,55 @@ NUM_ROWS = 8
 
 GAMMA = 0.99
 
-def state_from_board(board, hashable=False):
-    if not hashable:
-        state = np.zeros((NUM_COLORS * NUM_PIECES, NUM_ROWS, NUM_COLS))
-        for piece_type in chess.PIECE_TYPES:
-            for color in chess.COLORS:
-                pieces = bin(board.pieces(piece_type, color))
-                for i, piece in enumerate(reversed(pieces)):
-                    if piece == 'b':
-                        break
-                    elif piece == '1':
-                        row = i // NUM_ROWS
-                        col = i % NUM_ROWS
-                        state[(1-color)*NUM_PIECES + piece_type - 1, row, col] = 1
+def state_from_board(board, hashable=False, featurized=False):
+    if not featurized:
+        if not hashable:
+            state = np.zeros((NUM_COLORS * NUM_PIECES, NUM_ROWS, NUM_COLS))
+            for piece_type in chess.PIECE_TYPES:
+                for color in chess.COLORS:
+                    pieces = bin(board.pieces(piece_type, color))
+                    for i, piece in enumerate(reversed(pieces)):
+                        if piece == 'b':
+                            break
+                        elif piece == '1':
+                            row = i // NUM_ROWS
+                            col = i % NUM_ROWS
+                            state[(1-color)*NUM_PIECES + piece_type - 1, row, col] = 1
+        else:
+            state = [0] * NUM_SQUARES
+            for piece_type in chess.PIECE_TYPES:
+                for color in chess.COLORS:
+                    pieces = bin(board.pieces(piece_type, color))
+                    for i, piece in enumerate(reversed(pieces)):
+                        if piece == 'b':
+                            break
+                        elif piece == '1':
+                            state[i] = (1-color)*NUM_PIECES + piece_type - 1
+                            # row = i // NUM_ROWS
+                            # col = i % NUM_ROWS
+                            # state[row, col] = (1-color)*NUM_PIECES + piece_type - 1
+            state = str(state)
     else:
-        state = [0] * NUM_SQUARES
-        for piece_type in chess.PIECE_TYPES:
-            for color in chess.COLORS:
-                pieces = bin(board.pieces(piece_type, color))
-                for i, piece in enumerate(reversed(pieces)):
-                    if piece == 'b':
-                        break
-                    elif piece == '1':
-                        state[i] = (1-color)*NUM_PIECES + piece_type - 1
-                        # row = i // NUM_ROWS
-                        # col = i % NUM_ROWS
-                        # state[row, col] = (1-color)*NUM_PIECES + piece_type - 1
-        state = str(state)
+        def bitmap_to_array(bitmap):
+            return np.array([int(i) for i in bin(bitmap)[2:].zfill(NUM_SQUARES)]).reshape(NUM_ROWS, NUM_COLS)
+        state = state_from_board(board)
+        pieces = board.pawns | board.knights | board.bishops | board.rooks | board.queens | board.kings
+        # Knights
+        white_knights = board.knights & board.occupied_co[chess.WHITE]
+        black_knights = board.knights & board.occupied_co[chess.BLACK]
+        non_knights = pieces & (~board.knights)
+        white_non_knights = non_knights & board.occupied_co[chess.WHITE]
+        white_non_knights = non_knights & board.occupied_co[chess.BLACK]
+
+        arr_white_knights = bitmap_to_array(white_knights)
+        arr_black_knights = bitmap_to_array(black_knights)
+        arr_non_white_knights = bitmap_to_array(non_white_knights)
+        arr_non_black_knights = bitmap_to_array(non_black_knights)
+        print(arr_white_knights)
+        print(bin(white_knights))
+        print(bin(black_knights))
+        return pieces
+
     return state
 
 def action_from_board(board, move):
@@ -159,61 +181,106 @@ class Dataset:
             - piece type: p n b r q k
         """
         with open(self.filename) as pgn:
-            game = chess.pgn.read_game(pgn)
-            idx_move = 0
-            num_moves = int(game.headers["PlyCount"])
-            board = game.board()
-            node = game.root()
-
             while True:
-                if idx_move >= num_moves or num_moves <= 4:
-                    game = chess.pgn.read_game(pgn)
-                    if game is None:
-                        # EOF
-                        break
+                game = chess.pgn.read_game(pgn)
+                if game is None:
+                    break
 
-                    # Make sure game was played all the way through
-                    last_node = game.root()
-                    while last_node.variations:
-                        last_node = last_node.variations[0]
-                    if "forfeit" in last_node.comment:
-                        continue
+                num_moves = int(game.headers["PlyCount"])
+                board = game.board()
+                node = game.root()
 
-                    # Setup game and make sure it has enough moves
-                    idx_move = 0
-                    num_moves = int(game.headers["PlyCount"])
-                    board = game.board()
-                    node = game.root()
+                if num_moves <= 4:
                     continue
 
-                try:
-                    s = state_from_board(board).reshape((1, NUM_COLORS * NUM_PIECES, NUM_ROWS, NUM_COLS))
+                # Make sure game was played all the way through
+                last_node = game.root()
+                while last_node.variations:
+                    last_node = last_node.variations[0]
+                if "forfeit" in last_node.comment:
+                    continue
+
+                S = []
+                A = []
+                while node.variations:
+                    s = state_from_board(board)
                     move = node.variations[0].move
                     (piece_type, from_square, to_square) = action_from_board(board, move)
-                    a = np.zeros((1,NUM_PIECES))
-                    a[0, piece_type - 1] = 1
+                    a = np.zeros((NUM_PIECES,))
+                    a[piece_type - 1] = 1
 
                     # Play white
                     board.push(move)
-                    idx_move += 1
 
                     # Play black
                     node = node.variations[0]
                     if node.variations:
                         move = node.variations[0].move
                         board.push(move)
-                        idx_move += 1
 
                         if node.variations:
                             node = node.variations[0]
 
-                except Exception as e:
-                    print(e, file=sys.stderr)
-                    print("ERROR: ", s, a, r, s_prime, a_prime, game, idx_move, num_moves, file=sys.stderr)
-                    idx_move = num_moves
-                    continue
+                    S.append(s)
+                    A.append(a)
 
-                yield s, a
+                # Shuffle moves in game
+                random.shuffle(S)
+                random.shuffle(A)
+                S = np.array(S)
+                A = np.array(A)
+
+                yield S, A
+
+            # while True:
+            #     if idx_move >= num_moves or num_moves <= 4:
+            #         game = chess.pgn.read_game(pgn)
+            #         if game is None:
+            #             # EOF
+            #             break
+
+            #         # Make sure game was played all the way through
+            #         last_node = game.root()
+            #         while last_node.variations:
+            #             last_node = last_node.variations[0]
+            #         if "forfeit" in last_node.comment:
+            #             continue
+
+            #         # Setup game and make sure it has enough moves
+            #         idx_move = 0
+            #         num_moves = int(game.headers["PlyCount"])
+            #         board = game.board()
+            #         node = game.root()
+            #         continue
+
+            #     try:
+            #         s = state_from_board(board).reshape((1, NUM_COLORS * NUM_PIECES, NUM_ROWS, NUM_COLS))
+            #         move = node.variations[0].move
+            #         (piece_type, from_square, to_square) = action_from_board(board, move)
+            #         a = np.zeros((1,NUM_PIECES))
+            #         a[0, piece_type - 1] = 1
+
+            #         # Play white
+            #         board.push(move)
+            #         idx_move += 1
+
+            #         # Play black
+            #         node = node.variations[0]
+            #         if node.variations:
+            #             move = node.variations[0].move
+            #             board.push(move)
+            #             idx_move += 1
+
+            #             if node.variations:
+            #                 node = node.variations[0]
+
+            #     except Exception as e:
+            #         print(e, file=sys.stderr)
+            #         print("ERROR: ", s, a, r, s_prime, a_prime, game, idx_move, num_moves, file=sys.stderr)
+            #         idx_move = num_moves
+            #         continue
+
+            #     yield s, a
 
     def random_white_state(self):
         """
@@ -354,7 +421,8 @@ class Dataset:
                 print(line)
                 board.set_epd(line)
                 print(game)
-                return game
+                break
+            return game
 
             return None
             # game = chess.pgn.read_game(pgn)
