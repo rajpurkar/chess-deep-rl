@@ -40,8 +40,12 @@ def sarsa_lambda(data, LAMBDA=0.99, GAMMA=0.99, ALPHA=1/np.sqrt(dim_S)):
                     N[s_hat][a_hat] *= GAMMA * LAMBDA
 
             if i % 25000 == 0:
-                with open(picklefile, "wb") as f:
-                    pickle.dump(Q, f)
+                try:
+                    with open(picklefile, "wb") as f:
+                        pickle.dump(Q, f)
+                except:
+                    print("Failed to save pickle at iteration: %d" % i)
+                    pass
             i += 1
     except KeyboardInterrupt:
         pass
@@ -53,5 +57,8 @@ try:
 except Exception as e:
     print(e)
 
-with open(picklefile, "wb") as f:
-    pickle.dump(Q, f)
+try:
+    with open(picklefile, "wb") as f:
+        pickle.dump(Q, f)
+except:
+    print("Failed to save pickle")
