@@ -41,6 +41,13 @@ def state_from_board(board, hashable=False):
         state = str(state)
     return state
 
+def action_from_board(board, move):
+    if type(move) is chess.Move:
+        # piece - 1: pawn, 2: knight, 3: bishop, 4: rook, 5: queen, 6: king
+        piece = board.piece_at(move.from_square).piece_type
+        # square order - a1 b1 ... h1 a2 ... h2 ... h8
+        return (piece, move.from_square, move.to_square)
+
 class Dataset:
     def __init__(self, filename, loop=False):
         self.filename = filename
@@ -141,6 +148,73 @@ class Dataset:
 
                 yield s, a, r, s_prime, a_prime, new_game
 
+    def white_state_action_sl(self):
+        """
+        Returns (state, action) tuple from white's perspective
+        - state: np.array [12 pieces x 64 squares]
+            - piece order:  wp wn wb wr wq wk bp bn bb br bq bk
+            - square order: a1 b1 c1 ... h8
+        - action: number in [1, 6] representing piece type
+            - piece type: p n b r q k
+        """
+        with open(self.filename) as pgn:
+            game = chess.pgn.read_game(pgn)
+            idx_move = 0
+            num_moves = int(game.headers["PlyCount"])
+            board = game.board()
+            node = game.root()
+
+            while True:
+                if idx_move >= num_moves or num_moves <= 4:
+                    game = chess.pgn.read_game(pgn)
+                    if game is None:
+                        # EOF
+                        break
+
+                    # Make sure game was played all the way through
+                    last_node = game.root()
+                    while last_node.variations:
+                        last_node = last_node.variations[0]
+                    if "forfeit" in last_node.comment:
+                        continue
+
+                    # Setup game and make sure it has enough moves
+                    idx_move = 0
+                    num_moves = int(game.headers["PlyCount"])
+                    board = game.board()
+                    node = game.root()
+                    continue
+
+                try:
+                    s = state_from_board(board)
+                    move = node.variations[0].move
+                    (piece_type, from_square, to_square) = action_from_board(board, move)
+                    a = np.array([piece_type])
+                    print(board)
+                    print(move, piece_type, chess.PIECE_NAMES[piece_type])
+
+                    # Play white
+                    board.push(move)
+                    idx_move += 1
+
+                    # Play black
+                    node = node.variations[0]
+                    if node.variations:
+                        move = node.variations[0].move
+                        board.push(move)
+                        idx_move += 1
+
+                        if node.variations:
+                            node = node.variations[0]
+
+                except Exception as e:
+                    print(e, file=sys.stderr)
+                    print("ERROR: ", s, a, r, s_prime, a_prime, game, idx_move, num_moves, file=sys.stderr)
+                    idx_move = num_moves
+                    continue
+
+                yield s, a
+
     def random_white_state(self):
         """
         Returns (state, action, reward) tuple from white's perspective
@@ -160,6 +234,13 @@ class Dataset:
 
                 num_moves = int(game.headers["PlyCount"])
                 if num_moves < 2:
+                    continue
+
+                # Make sure game was played all the way through
+                last_node = game.root()
+                while last_node.variations:
+                    last_node = last_node.variations[0]
+                if "forfeit" in last_node.comment:
                     continue
 
                 # Choose a random white-turn state
@@ -214,6 +295,13 @@ class Dataset:
 
                 num_moves = int(game.headers["PlyCount"])
                 if num_moves < 2:
+                    continue
+
+                # Make sure game was played all the way through
+                last_node = game.root()
+                while last_node.variations:
+                    last_node = last_node.variations[0]
+                if "forfeit" in last_node.comment:
                     continue
 
                 # Choose a random black-turn state
