@@ -56,26 +56,26 @@ class Dataset:
         self.num_games = 0
         # self.idx_moves = []
 
-    def load(self):
+    def load(self, iterator):
         try:
-            X_y = self.unpickle()
+            X_y = self.unpickle(iterator)
         except:
-            X_y = self.pickle()
+            X_y = self.pickle(iterator)
         return X_y
 
-    def pickle(self):
+    def pickle(self, iterator):
         X = []
-        y = []
-        for state, reward in self.random_black_state():
-            X.append(np.squeeze(state))
-            y.append(reward)
+        Y = []
+        for x, y in iterator():
+            X.append(np.squeeze(x))
+            Y.append(np.squeeze(y))
         X = np.array(X)
-        y = np.array(y)
+        Y = np.array(Y)
         np.save(self.filename + ".X.npy", X)
-        np.save(self.filename + ".y.npy", y)
-        return X, y
+        np.save(self.filename + ".y.npy", Y)
+        return X, Y
 
-    def unpickle(self):
+    def unpickle(self, iterator):
         X = np.load(self.filename + ".X.npy")
         y = np.load(self.filename + ".y.npy")
         return X, y
@@ -337,6 +337,74 @@ class Dataset:
                 self.idx_game += 1
                 yield state, reward
 
+    def strategic_test_suite(self):
+        """
+        Returns (state, action) tuple from white's perspective
+        - state: np.array [12 pieces x 64 squares]
+            - piece order:  wp wn wb wr wq wk bp bn bb br bq bk
+            - square order: a1 b1 c1 ... h8
+        - action: np.array [6 pieces x 1] representing piece type
+            - piece type: p n b r q k
+        """
+        with open(self.filename) as epd:
+            game = chess.Game()
+            board = game.board()
+            board.set_epd()
+            game = chess.pgn.read_game(pgn)
+            idx_move = 0
+            num_moves = int(game.headers["PlyCount"])
+            board = game.board()
+            node = game.root()
+
+            while True:
+                if idx_move >= num_moves or num_moves <= 4:
+                    game = chess.pgn.read_game(pgn)
+                    if game is None:
+                        # EOF
+                        break
+
+                    # Make sure game was played all the way through
+                    last_node = game.root()
+                    while last_node.variations:
+                        last_node = last_node.variations[0]
+                    if "forfeit" in last_node.comment:
+                        continue
+
+                    # Setup game and make sure it has enough moves
+                    idx_move = 0
+                    num_moves = int(game.headers["PlyCount"])
+                    board = game.board()
+                    node = game.root()
+                    continue
+
+                try:
+                    s = state_from_board(board).reshape((1, NUM_COLORS * NUM_PIECES, NUM_ROWS, NUM_COLS))
+                    move = node.variations[0].move
+                    (piece_type, from_square, to_square) = action_from_board(board, move)
+                    a = np.zeros((1,NUM_PIECES))
+                    a[0, piece_type - 1] = 1
+
+                    # Play white
+                    board.push(move)
+                    idx_move += 1
+
+                    # Play black
+                    node = node.variations[0]
+                    if node.variations:
+                        move = node.variations[0].move
+                        board.push(move)
+                        idx_move += 1
+
+                        if node.variations:
+                            node = node.variations[0]
+
+                except Exception as e:
+                    print(e, file=sys.stderr)
+                    print("ERROR: ", s, a, r, s_prime, a_prime, game, idx_move, num_moves, file=sys.stderr)
+                    idx_move = num_moves
+                    continue
+
+                yield s, a
     # def load_games(self):
     #     with open(self.filename) as pgn:
     #         self.games = []
