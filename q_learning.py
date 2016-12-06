@@ -3,6 +3,7 @@ import data
 import pickle
 from tqdm import tqdm
 import time
+import cProfile
 
 dim_S = data.NUM_SQUARES * data.NUM_PIECES * data.NUM_COLORS
 dim_A = dim_S * dim_S
@@ -16,15 +17,19 @@ def sarsa_lambda(data, LAMBDA=0.99, GAMMA=0.99, ALPHA=1/np.sqrt(dim_S)):
     N = {}
     try:
         i = 0
-        for s, a, r, s_prime, a_prime in tqdm(data.white_sarsa()):
+        for s, a, r, s_prime, a_prime, new_game in tqdm(data.white_sarsa()):
+            if new_game:
+                N = {}
             if s not in N:
-                Q[s] = {}
                 N[s] = {}
+                if s not in Q:
+                    Q[s] = {}
             if a not in N[s]:
-                Q[s][a] = 0
                 N[s][a] = 0
+                if a not in Q[s]:
+                    Q[s][a] = 0
             Q_prime = 0
-            if s_prime in N and a_prime in N[s_prime]:
+            if s_prime in Q and a_prime in Q[s_prime]:
                 Q_prime = Q[s_prime][a_prime]
 
             N[s][a] += 1
@@ -39,7 +44,7 @@ def sarsa_lambda(data, LAMBDA=0.99, GAMMA=0.99, ALPHA=1/np.sqrt(dim_S)):
                     pickle.dump(Q, f)
             i += 1
     except KeyboardInterrupt:
-        return Q, N
+        pass
     return Q, N
 
 try:

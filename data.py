@@ -83,7 +83,7 @@ class Dataset:
             s = state_from_board(board, hashable=True)
             s_prime = s
             while True:
-                if idx_move == num_moves or num_moves < 2:
+                if idx_move >= num_moves or num_moves <= 4:
                     game = chess.pgn.read_game(pgn)
                     if game is None:
                         break
@@ -93,40 +93,42 @@ class Dataset:
                     node = game.root()
                     continue
 
+                new_game = (idx_move == 0)
+
                 try:
-                    # Play moves up to idx_move
+                    # Play white
                     s = s_prime
                     move = node.variations[0].move
                     board.push(move)
                     a = move.from_square * NUM_SQUARES + move.to_square
-                    s_prime = state_from_board(board, hashable=True)
-
-                    node = node.variations[0]
                     idx_move += 1
+
+                    # Play black
+                    node = node.variations[0]
+                    if node.variations:
+                        move = node.variations[0].move
+                        board.push(move)
+                        node = node.variations[0]
+                        idx_move += 1
+
+                    s_prime = state_from_board(board, hashable=True)
 
                     a_prime = None
                     if node.variations:
                         move = node.variations[0].move
                         a_prime = move.from_square * NUM_SQUARES + move.to_square
 
-                    # headers["Result"]: {"0-1", "1-0", "1/2-1/2"}
-                    # result: {-1, 0, 1}
-                    # Parse result from header
-                    white_score = game.headers["Result"].split("-")[0].split("/")
-                    if len(white_score) == 1:
-                        result = 2 * int(white_score[0]) - 1
-                    else:
-                        result = 0
-                    # moves_remaining = (num_moves - idx_move) // 2
-                    # r = (GAMMA ** moves_remaining) * result
                     r = 0
-                    if idx_move >= num_moves - 1:
-                        r = result
+                    if idx_move >= num_moves:
+                        # Parse result from header
+                        white_score = game.headers["Result"].split("-")[0].split("/")
+                        if len(white_score) == 1:
+                            r = 2 * int(white_score[0]) - 1
                 except:
                     print("ERROR: ", s, a, r, s_prime, a_prime, game, idx_move, num_moves)
                     continue
 
-                yield s, a, r, s_prime, a_prime
+                yield s, a, r, s_prime, a_prime, new_game
 
     def random_white_state(self):
         """
