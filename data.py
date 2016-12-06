@@ -154,7 +154,7 @@ class Dataset:
         - state: np.array [12 pieces x 64 squares]
             - piece order:  wp wn wb wr wq wk bp bn bb br bq bk
             - square order: a1 b1 c1 ... h8
-        - action: number in [1, 6] representing piece type
+        - action: np.array [6 pieces x 1] representing piece type
             - piece type: p n b r q k
         """
         with open(self.filename) as pgn:
@@ -189,9 +189,8 @@ class Dataset:
                     s = state_from_board(board)
                     move = node.variations[0].move
                     (piece_type, from_square, to_square) = action_from_board(board, move)
-                    a = np.array([piece_type])
-                    print(board)
-                    print(move, piece_type, chess.PIECE_NAMES[piece_type])
+                    a = np.array((NUM_PIECES,))
+                    a[piece_type - 1] = 1
 
                     # Play white
                     board.push(move)
