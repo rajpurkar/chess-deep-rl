@@ -187,7 +187,7 @@ class Dataset:
                     continue
 
                 try:
-                    s = state_from_board(board)
+                    s = state_from_board(board).reshape((1, NUM_COLORS * NUM_PIECES, NUM_ROWS, NUM_COLS))
                     move = node.variations[0].move
                     (piece_type, from_square, to_square) = action_from_board(board, move)
                     a = np.zeros((1,NUM_PIECES))
@@ -350,62 +350,69 @@ class Dataset:
         with open(self.filename) as epd:
             game = chess.Game()
             board = game.board()
-            board.set_epd()
-            game = chess.pgn.read_game(pgn)
-            idx_move = 0
-            num_moves = int(game.headers["PlyCount"])
-            board = game.board()
-            node = game.root()
+            for line in epd:
+                print(line)
+                board.set_epd(line)
+                print(game)
+                return game
 
-            while True:
-                if idx_move >= num_moves or num_moves <= 4:
-                    game = chess.pgn.read_game(pgn)
-                    if game is None:
-                        # EOF
-                        break
+            return None
+            # game = chess.pgn.read_game(pgn)
+            # idx_move = 0
+            # num_moves = int(game.headers["PlyCount"])
+            # board = game.board()
+            # node = game.root()
 
-                    # Make sure game was played all the way through
-                    last_node = game.root()
-                    while last_node.variations:
-                        last_node = last_node.variations[0]
-                    if "forfeit" in last_node.comment:
-                        continue
+            # while True:
+            #     if idx_move >= num_moves or num_moves <= 4:
+            #         game = chess.pgn.read_game(pgn)
+            #         if game is None:
+            #             # EOF
+            #             break
 
-                    # Setup game and make sure it has enough moves
-                    idx_move = 0
-                    num_moves = int(game.headers["PlyCount"])
-                    board = game.board()
-                    node = game.root()
-                    continue
+            #         # Make sure game was played all the way through
+            #         last_node = game.root()
+            #         while last_node.variations:
+            #             last_node = last_node.variations[0]
+            #         if "forfeit" in last_node.comment:
+            #             continue
 
-                try:
-                    s = state_from_board(board).reshape((1, NUM_COLORS * NUM_PIECES, NUM_ROWS, NUM_COLS))
-                    move = node.variations[0].move
-                    (piece_type, from_square, to_square) = action_from_board(board, move)
-                    a = np.zeros((1,NUM_PIECES))
-                    a[0, piece_type - 1] = 1
+            #         # Setup game and make sure it has enough moves
+            #         idx_move = 0
+            #         num_moves = int(game.headers["PlyCount"])
+            #         board = game.board()
+            #         node = game.root()
+            #         continue
 
-                    # Play white
-                    board.push(move)
-                    idx_move += 1
+            #     try:
+            #         s = state_from_board(board).reshape((1, NUM_COLORS * NUM_PIECES, NUM_ROWS, NUM_COLS))
+            #         move = node.variations[0].move
+            #         (piece_type, from_square, to_square) = action_from_board(board, move)
+            #         a = np.zeros((1,NUM_PIECES))
+            #         a[0, piece_type - 1] = 1
 
-                    # Play black
-                    node = node.variations[0]
-                    if node.variations:
-                        move = node.variations[0].move
-                        board.push(move)
-                        idx_move += 1
+            #         # Play white
+            #         board.push(move)
+            #         idx_move += 1
 
-                        if node.variations:
-                            node = node.variations[0]
+            #         # Play black
+            #         node = node.variations[0]
+            #         if node.variations:
+            #             move = node.variations[0].move
+            #             board.push(move)
+            #             idx_move += 1
 
-                except Exception as e:
-                    print(e, file=sys.stderr)
-                    print("ERROR: ", s, a, r, s_prime, a_prime, game, idx_move, num_moves, file=sys.stderr)
-                    idx_move = num_moves
-                    continue
+            #             if node.variations:
+            #                 node = node.variations[0]
 
-                yield s, a
+            #     except Exception as e:
+            #         print(e, file=sys.stderr)
+            #         print("ERROR: ", s, a, r, s_prime, a_prime, game, idx_move, num_moves, file=sys.stderr)
+            #         idx_move = num_moves
+            #         continue
+
+            #     yield s, a
+
     # def load_games(self):
     #     with open(self.filename) as pgn:
     #         self.games = []
