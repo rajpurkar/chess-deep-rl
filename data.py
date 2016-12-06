@@ -56,28 +56,29 @@ class Dataset:
         self.num_games = 0
         # self.idx_moves = []
 
-    def load(self, iterator):
+    def load(self, generator):
+        assert(type(generator) == str)
         try:
-            X_y = self.unpickle(iterator)
+            X_y = self.unpickle(generator)
         except:
-            X_y = self.pickle(iterator)
+            X_y = self.pickle(generator)
         return X_y
 
-    def pickle(self, iterator):
+    def pickle(self, generator):
         X = []
         Y = []
-        for x, y in iterator():
+        for x, y in getattr(self, generator)():
             X.append(np.squeeze(x))
             Y.append(np.squeeze(y))
         X = np.array(X)
         Y = np.array(Y)
-        np.save(self.filename + ".X.npy", X)
-        np.save(self.filename + ".y.npy", Y)
+        np.save(self.filename + "." + generator + ".X.npy", X)
+        np.save(self.filename + "." + generator + ".y.npy", Y)
         return X, Y
 
-    def unpickle(self, iterator):
-        X = np.load(self.filename + ".X.npy")
-        y = np.load(self.filename + ".y.npy")
+    def unpickle(self, generator):
+        X = np.load(self.filename + "." + generator + ".X.npy")
+        y = np.load(self.filename + "." + generator + ".y.npy")
         return X, y
 
     def white_sarsa(self):
