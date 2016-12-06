@@ -189,8 +189,8 @@ class Dataset:
                     s = state_from_board(board)
                     move = node.variations[0].move
                     (piece_type, from_square, to_square) = action_from_board(board, move)
-                    a = np.array((NUM_PIECES,))
-                    a[piece_type - 1] = 1
+                    a = np.zeros((1,NUM_PIECES))
+                    a[0, piece_type - 1] = 1
 
                     # Play white
                     board.push(move)
