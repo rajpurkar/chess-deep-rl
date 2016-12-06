@@ -12,18 +12,33 @@ NUM_ROWS = 8
 
 GAMMA = 0.99
 
-def state_from_board(board):
-    state = np.zeros((NUM_COLORS * NUM_PIECES, NUM_ROWS, NUM_COLS))
-    for piece_type in chess.PIECE_TYPES:
-        for color in chess.COLORS:
-            pieces = bin(board.pieces(piece_type, color))
-            for i, piece in enumerate(reversed(pieces)):
-                if piece == 'b':
-                    break
-                elif piece == '1':
-                    row = i // NUM_ROWS
-                    col = i % NUM_ROWS
-                    state[(1-color)*NUM_PIECES + piece_type - 1, row, col] = 1
+def state_from_board(board, hashable=False):
+    if not hashable:
+        state = np.zeros((NUM_COLORS * NUM_PIECES, NUM_ROWS, NUM_COLS))
+        for piece_type in chess.PIECE_TYPES:
+            for color in chess.COLORS:
+                pieces = bin(board.pieces(piece_type, color))
+                for i, piece in enumerate(reversed(pieces)):
+                    if piece == 'b':
+                        break
+                    elif piece == '1':
+                        row = i // NUM_ROWS
+                        col = i % NUM_ROWS
+                        state[(1-color)*NUM_PIECES + piece_type - 1, row, col] = 1
+    else:
+        state = [0] * NUM_SQUARES
+        for piece_type in chess.PIECE_TYPES:
+            for color in chess.COLORS:
+                pieces = bin(board.pieces(piece_type, color))
+                for i, piece in enumerate(reversed(pieces)):
+                    if piece == 'b':
+                        break
+                    elif piece == '1':
+                        state[i] = (1-color)*NUM_PIECES + piece_type - 1
+                        # row = i // NUM_ROWS
+                        # col = i % NUM_ROWS
+                        # state[row, col] = (1-color)*NUM_PIECES + piece_type - 1
+        state = str(state)
     return state
 
 class Dataset:
@@ -58,6 +73,61 @@ class Dataset:
         y = np.load(self.filename + ".y.npy")
         return X, y
 
+    def white_sarsa(self):
+        with open(self.filename) as pgn:
+            game = chess.pgn.read_game(pgn)
+            idx_move = 0
+            num_moves = int(game.headers["PlyCount"])
+            board = game.board()
+            node = game.root()
+            s = state_from_board(board, hashable=True)
+            s_prime = s
+            while True:
+                if idx_move == num_moves or num_moves < 2:
+                    game = chess.pgn.read_game(pgn)
+                    if game is None:
+                        break
+                    idx_move = 0
+                    num_moves = int(game.headers["PlyCount"])
+                    board = game.board()
+                    node = game.root()
+                    continue
+
+                try:
+                    # Play moves up to idx_move
+                    s = s_prime
+                    move = node.variations[0].move
+                    board.push(move)
+                    a = move.from_square * NUM_SQUARES + move.to_square
+                    s_prime = state_from_board(board, hashable=True)
+
+                    node = node.variations[0]
+                    idx_move += 1
+
+                    a_prime = None
+                    if node.variations:
+                        move = node.variations[0].move
+                        a_prime = move.from_square * NUM_SQUARES + move.to_square
+
+                    # headers["Result"]: {"0-1", "1-0", "1/2-1/2"}
+                    # result: {-1, 0, 1}
+                    # Parse result from header
+                    white_score = game.headers["Result"].split("-")[0].split("/")
+                    if len(white_score) == 1:
+                        result = 2 * int(white_score[0]) - 1
+                    else:
+                        result = 0
+                    # moves_remaining = (num_moves - idx_move) // 2
+                    # r = (GAMMA ** moves_remaining) * result
+                    r = 0
+                    if idx_move >= num_moves - 1:
+                        r = result
+                except:
+                    print("ERROR: ", s, a, r, s_prime, a_prime, game, idx_move, num_moves)
+                    continue
+
+                yield s, a, r, s_prime, a_prime
+
     def random_white_state(self):
         """
         Returns (state, action, reward) tuple from white's perspective
@@ -76,8 +146,12 @@ class Dataset:
                     break
 
                 num_moves = int(game.headers["PlyCount"])
+                if num_moves < 2:
+                    continue
+
                 # Choose a random white-turn state
-                idx_move = random.randint(1, int(num_moves / 2)) * 2
+                idx_move = random.randint(1, num_moves // 2) * 2
+                moves_remaining = num_moves - idx_move
 
                 # Play moves up to idx_move
                 board = game.board()
@@ -85,6 +159,7 @@ class Dataset:
                 for i in range(idx_move):
                     board.push(node.variations[0].move)
                     node = node.variations[0]
+
                 move = node.variations[0].move
                 promotion = move.promotion
                 if promotion is None:
@@ -100,15 +175,7 @@ class Dataset:
                 else:
                     result = 0
 
-                state = np.zeros((NUM_COLORS*NUM_PIECES, NUM_SQUARES))
-                for piece_type in chess.PIECE_TYPES:
-                    for color in chess.COLORS:
-                        pieces = bin(board.pieces(piece_type, color))
-                        for i, piece in enumerate(reversed(pieces)):
-                            if piece == 'b':
-                                break
-                            elif piece == '1':
-                                state[(1-color)*NUM_PIECES + piece_type - 1, i] = 1
+                state = state_from_board(board)
 
                 yield state, action, result
 
@@ -146,7 +213,7 @@ class Dataset:
                 # else:
                 #     idx_move = random.randint(1, num_moves // 2) * 2 - 1
                 idx_move = random.randint(1, num_moves // 2) * 2 - 1
-                moves_remaining = num_moves - idx_move
+                moves_remaining = (num_moves - idx_move) // 2
 
                 # Play moves up to idx_move
                 board = game.board()
