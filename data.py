@@ -301,7 +301,7 @@ class Dataset:
                     row = NUM_ROWS - 1 - (from_square // NUM_ROWS)
                     col = from_square % NUM_ROWS
                     a[row,col] = 1
-                    a = a.shape((NUM_SQUARES,))
+                    a = a.reshape((NUM_SQUARES,))
 
                     # Play white
                     board.push(move)
