@@ -286,7 +286,7 @@ class Dataset:
                 S = []
                 A = []
                 while node.variations:
-                    s = state_from_board(board)
+                    s = state_from_board(board, featurized=True)
                     move = node.variations[0].move
                     (piece_type, from_square, to_square) = action_from_board(board, move)
                     a = np.zeros((NUM_PIECES,))
@@ -310,10 +310,9 @@ class Dataset:
                 # Shuffle moves in game
                 random.shuffle(S)
                 random.shuffle(A)
-                S = np.array(S)
-                A = np.array(A)
 
-                yield S, A
+                for s, a in zip(S, A):
+                    yield s.reshape((1, *s.shape)), a.reshape((1, *a.shape))
 
             # while True:
             #     if idx_move >= num_moves or num_moves <= 4:
