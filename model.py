@@ -14,15 +14,14 @@ VERBOSE_LEVEL = 1
 def common_network(**kwargs):
     from keras.layers.convolutional import Convolution2D
     from keras.layers import Input, Flatten
-    from keras.layers.core import Activation
     from keras.layers.normalization import BatchNormalization
     from keras.layers.advanced_activations import PReLU
     defaults = {
         "board": 8,
         "board_depth": 12,
-        "layers": 4,
+        "layers": 6,
         "num_filters": 64,
-        "one_convolve": False,
+        "one_convolve": False
     }
     params = defaults
     params.update(kwargs)
@@ -42,7 +41,7 @@ def common_network(**kwargs):
             filter_width = 1
             num_filters = 1
         conv_start = Convolution2D(
-            nb_filter= num_filters,
+            nb_filter=num_filters,
             nb_row=filter_width,
             nb_col=filter_width,
             init='he_normal',
@@ -69,10 +68,21 @@ def value_network(**kwargs):
 def policy_network(**kwargs):
     from keras.models import Model
     from keras.layers import Dense
+    from keras.layers.normalization import BatchNormalization
+    from keras.layers.advanced_activations import PReLU
+
+    params = {
+        "dense_layers": 2,
+    }
+    params.update(kwargs)
+
     conv_input, flattened = common_network(**kwargs)
-    # dense_3 = Dense(64, activation="relu", init="he_normal")(flattened)
-    dense_3 = flattened
-    output = Dense(64, activation="softmax")(dense_3)
+    for i in range(params["dense_layers"]):
+        dense_mess = Dense(64, init="he_normal")(flattened)
+        dense_mess = BatchNormalization()(dense_mess)
+        dense_mess = PReLU()(dense_mess)
+        # dense_mess = Dropout(0.5)(dense_mess)
+    output = Dense(64, activation="softmax")(dense_mess)
     model = Model(conv_input, output)
     model.compile('adam', 'categorical_crossentropy', metrics=['accuracy'])
     return model
@@ -87,7 +97,7 @@ def get_filename_for_saving(net_type, start_time):
 
 def train(net_type):
     from keras.callbacks import ModelCheckpoint
-    d = Dataset('data/large-fics.pgn')
+    d = Dataset('data/large-ccrl.pgn')
     start_time = str(int(time.time()))
     checkpointer = ModelCheckpoint(
         filepath=get_filename_for_saving(net_type, start_time),
