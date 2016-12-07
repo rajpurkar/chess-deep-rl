@@ -98,3 +98,4 @@ ficsgamesdb_1999-2015_standard2000_nomovetimes.pgn
 engines/stockfish
 saved/
 *.npy
+data/
