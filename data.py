@@ -149,21 +149,22 @@ def featurized_state_from_board(board):
     phi = np.array([*phi_rooks, *phi_bishops, *phi_queens, white_pieces, black_pieces, free_spaces])
     return np.append(state, phi, axis=0)
 
-def action_from_board(board, move, from_board=True):
+def action_from_board(board, move):
+    def square_ind_to_sub(idx_square):
+        row = (idx_square // NUM_ROWS)
+        col = idx_square % NUM_ROWS
+        return row, col
+
     if type(move) is chess.Move:
         # piece - 1: pawn, 2: knight, 3: bishop, 4: rook, 5: queen, 6: king
         # piece = board.piece_at(move.from_square).piece_type
 
         # square order - a1 b1 ... h1 a2 ... h2 ... h8
-        a = np.zeros((NUM_ROWS, NUM_COLS))
-        if from_board:
-            idx_square = move.from_square
-        else:
-            idx_square = move.to_square
-        row = NUM_ROWS - 1 - (idx_square // NUM_ROWS)
-        col = idx_square % NUM_ROWS
-        a[row,col] = 1
-        return a.reshape((NUM_SQUARES,))
+        a_from = np.zeros((NUM_ROWS, NUM_COLS))
+        a_to = np.zeros((NUM_ROWS, NUM_COLS))
+        a_from[square_ind_to_sub(move.from_square)] = 1
+        a_to[square_ind_to_sub(move.to_square)] = 1
+        return (a_from.reshape((NUM_SQUARES,)), a_to.reshape((NUM_SQUARES,)))
 
 class Dataset:
     def __init__(self, filename, loop=False):
@@ -187,21 +188,39 @@ class Dataset:
 
     def pickle(self, generator):
         X = []
-        Y = []
+        Y1 = []
+        Y2 = []
         print("Pickling data:")
-        for x, y in tqdm(getattr(self, generator)()):
-            X.append(x)
-            Y.append(y)
+        for X_y in tqdm(getattr(self, generator)(loop=False)):
+            if len(X_y) == 2:
+                x, y = X_y
+                X.append(x)
+                Y.append(y)
+            elif len(X_y) == 3:
+                x, y1, y2 = X_y
+                X.append(x)
+                Y1.append(y1)
+                Y2.append(y2)
         X = np.concatenate(X)
-        Y = np.concatenate(Y)
         np.save(self.filename + "." + generator + ".X.npy", X)
-        np.save(self.filename + "." + generator + ".y.npy", Y)
-        return X, Y
+
+        Y1 = np.concatenate(Y1)
+        np.save(self.filename + "." + generator + ".y.npy", Y1)
+        if not Y2:
+            return X, Y1
+
+        Y2 = np.concatenate(Y2)
+        np.save(self.filename + "." + generator + ".y2.npy", Y2)
+        return X, Y1, Y2
 
     def unpickle(self, generator):
         X = np.load(self.filename + "." + generator + ".X.npy")
-        y = np.load(self.filename + "." + generator + ".y.npy")
-        return X, y
+        Y1 = np.load(self.filename + "." + generator + ".y.npy")
+        try:
+            Y2 = np.load(self.filename + "." + generator + ".y2.npy")
+        except:
+            return X, Y1
+        return X, Y1, Y2
 
     def white_sarsa(self):
         with open(self.filename) as pgn:
@@ -283,7 +302,7 @@ class Dataset:
     def white_state_toaction_sl(self, loop=False):
         return self.white_state_action_sl(from_board=False, loop=loop)
 
-    def white_state_action_sl(self, from_board=True, loop=False, featurized=False):
+    def white_state_action_sl(self, loop=True, featurized=False):
         """
         Returns (state, action) tuple from white's perspective
         - state: np.array [12 pieces x 64 squares]
@@ -296,7 +315,8 @@ class Dataset:
         idx_batch = 0
         with open(self.filename) as pgn:
             S = []
-            A = []
+            A_from = []
+            A_to = []
             while True:
                 game = chess.pgn.read_game(pgn)
                 if game is None:
@@ -325,7 +345,7 @@ class Dataset:
                 while node.variations:
                     s = state_from_board(board, featurized=featurized)
                     move = node.variations[0].move
-                    a = action_from_board(board, move, from_board)
+                    a_from, a_to = action_from_board(board, move)
 
                     # Play white
                     board.push(move)
@@ -340,18 +360,21 @@ class Dataset:
                             node = node.variations[0]
 
                     S.append(s)
-                    A.append(a)
+                    A_from.append(a_from)
+                    A_to.append(a_to)
                     idx_batch += 1
 
                     if idx_batch == BATCH_SIZE:
                         # Shuffle moves in game
                         idx = list(np.random.permutation(len(S)))
                         S_shuffle = [S[i] for i in idx]
-                        A_shuffle = [A[i] for i in idx]
+                        A_from_shuffle = [A_from[i] for i in idx]
+                        A_to_shuffle = [A_to[i] for i in idx]
                         S = []
-                        A = []
+                        A_from = []
+                        A_to = []
                         idx_batch = 0
-                        yield np.array(S_shuffle), np.array(A_shuffle)
+                        yield np.array(S_shuffle), np.array(A_from_shuffle), np.array(A_to_shuffle)
 
     def random_white_state(self):
         """
