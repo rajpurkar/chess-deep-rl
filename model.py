@@ -16,8 +16,8 @@ VERBOSE_LEVEL = 1
 def common_network(**kwargs):
     defaults = {
         "board": 8,
-        "board_depth": 12,
-        "layers": 6,
+        "board_depth": 29,
+        "layers": 5,
         "num_filters": 100
     }
     params = defaults
@@ -32,7 +32,7 @@ def common_network(**kwargs):
     for i in range(0, params["layers"]):
         # use filter_width_K if it is there, otherwise use 3
         filter_key = "filter_width_%d" % i
-        filter_width = params.get(filter_key, 2 + i*2)
+        filter_width = params.get(filter_key, 11 - i*2)
         conv_start = Convolution2D(
             nb_filter=params["num_filters"],
             nb_row=filter_width,
@@ -56,21 +56,22 @@ def common_network(**kwargs):
 
 def value_network(**kwargs):
     """ Use a variation of the ROCAlphaGo Value Network. """
-    conv_input, flattened = common_network(**kwargs) 
-    output = Dense(1, init='uniform', activation="tanh")(flattened)
-    model = Model(conv_input, output)
-    model.compile('adam', 'mse')
-    return model
-
-
-def six_piece_policy_network(**kwargs):
-    conv_input, flattened = common_network(**kwargs) 
+    conv_input, flattened = common_network(**kwargs)
     dense_1 = Dense(1000, activation="relu")(flattened)
     dense_2 = Dense(500, activation="relu")(dense_1)
     dense_3 = Dense(250, activation="relu")(dense_2)
     output = Dense(6, activation="softmax")(dense_3)
     model = Model(conv_input, output)
-    model.compile('adamax', 'categorical_crossentropy', metrics=['accuracy'])
+    model.compile('adamax', 'mse')
+    return model
+
+
+def six_piece_policy_network(**kwargs):
+    conv_input, flattened = common_network(**kwargs) 
+    dense_1 = Dense(250, activation="relu")(flattened)
+    output = Dense(6, activation="softmax")(dense_1)
+    model = Model(conv_input, output)
+    model.compile('adam', 'categorical_crossentropy', metrics=['accuracy'])
     return model
 
 
@@ -86,7 +87,7 @@ def train(net_type):
     start_time = str(int(time.time()))
     checkpointer = ModelCheckpoint(
         filepath=get_filename_for_saving(net_type, start_time),
-        verbose=VERBOSE_LEVEL,
+        verbose=2,
         save_best_only=True)
     if net_type == "value":
         model = value_network()

@@ -4,6 +4,7 @@ import chess
 import chess.pgn
 import numpy as np
 import itertools
+from tqdm import tqdm
 import re
 
 NUM_PIECES = len(chess.PIECE_TYPES)
@@ -177,7 +178,7 @@ class Dataset:
     def pickle(self, generator):
         X = []
         Y = []
-        for x, y in getattr(self, generator)():
+        for x, y in tqdm(getattr(self, generator)()):
             X.append(np.squeeze(x))
             Y.append(np.squeeze(y))
         X = np.array(X)
