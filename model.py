@@ -7,21 +7,21 @@ np.random.seed(20)
 
 FOLDER_TO_SAVE = "./saved/"
 NUMBER_EPOCHS = 10000  # some large number
-SAMPLES_PER_EPOCH = 10016  # tune for feedback/speed balance
+SAMPLES_PER_EPOCH = 40064  # tune for feedback/speed balance
 VERBOSE_LEVEL = 1
 
 
 def common_network(**kwargs):
     from keras.layers.convolutional import Convolution2D
-    from keras.layers import Input, Flatten
+    from keras.layers import Input, Flatten, Dropout
     from keras.layers.normalization import BatchNormalization
     from keras.layers.advanced_activations import PReLU
     defaults = {
         "board": 8,
         "board_depth": 12,
-        "layers": 6,
-        "num_filters": 64,
-        "one_convolve": False
+        "layers": 4,
+        "num_filters": 6,
+        "dropout": 0
     }
     params = defaults
     params.update(kwargs)
@@ -31,25 +31,23 @@ def common_network(**kwargs):
         params["board"],
         params["board"]))
 
-    conv_start = conv_input
+    conv_mess = conv_input
     for i in range(0, params["layers"]):
         # use filter_width_K if it is there, otherwise use 3
         filter_key = "filter_width_%d" % i
         filter_width = params.get(filter_key, 3)
         num_filters = params["num_filters"]
-        if i == params["layers"] - 1 and params["one_convolve"] is True:
-            filter_width = 1
-            num_filters = 1
-        conv_start = Convolution2D(
+        conv_mess = Convolution2D(
             nb_filter=num_filters,
             nb_row=filter_width,
             nb_col=filter_width,
             init='he_normal',
-            border_mode='same')(conv_start)
-        # conv_start = Activation('relu')(conv_start)
-        conv_start = BatchNormalization()(conv_start)
-        conv_start = PReLU()(conv_start)
-    flattened = Flatten()(conv_start)
+            border_mode='same')(conv_mess)
+        conv_mess = BatchNormalization()(conv_mess)
+        conv_mess = PReLU()(conv_mess)
+        if params["dropout"] > 0:
+            conv_mess = Dropout(params["dropout"])(conv_mess)
+    flattened = Flatten()(conv_mess)
     return conv_input, flattened
 
 
@@ -67,23 +65,34 @@ def value_network(**kwargs):
 
 def policy_network(**kwargs):
     from keras.models import Model
-    from keras.layers import Dense
+    from keras.layers import Dense, Dropout
     from keras.layers.normalization import BatchNormalization
     from keras.layers.advanced_activations import PReLU
 
     params = {
-        "dense_layers": 2,
+        "dense_layers": 1,
+        "dense_hidden": 64,
+        "output_size": 64,
+        "dropout": 0
     }
     params.update(kwargs)
 
     conv_input, flattened = common_network(**kwargs)
+    dense_mess = flattened
     for i in range(params["dense_layers"]):
-        dense_mess = Dense(64, init="he_normal")(flattened)
+        dense_mess = Dense(params["dense_hidden"], init="he_normal")(dense_mess)
         dense_mess = BatchNormalization()(dense_mess)
         dense_mess = PReLU()(dense_mess)
-        # dense_mess = Dropout(0.5)(dense_mess)
-    output = Dense(64, activation="softmax")(dense_mess)
-    model = Model(conv_input, output)
+        if params["dropout"] > 0:
+            dense_mess = Dropout(params["dropout"])(dense_mess)
+
+    # output for the first board
+    output1 = Dense(params["output_size"], activation="softmax")(dense_mess)
+
+    # output for the second board
+    output2 = Dense(params["output_size"], activation="softmax")(dense_mess)
+
+    model = Model(conv_input, [output1, output2])
     model.compile('adam', 'categorical_crossentropy', metrics=['accuracy'])
     return model
 
@@ -111,14 +120,14 @@ def train(net_type):
         model = policy_network()
         generator_str = 'white_state_action_sl'
         generator_fn = d.white_state_action_sl
-    d_test = Dataset('data/small_test.pgn')
-    (X_test, y_test) = d_test.load(generator_str, refresh=False)
+    d_test = Dataset('data/medium_test.pgn')
+    X_test, y_start, y_end = d_test.load(generator_str, refresh=False)
     model.fit_generator(
         generator_fn(),
         samples_per_epoch=SAMPLES_PER_EPOCH,
         nb_epoch=NUMBER_EPOCHS,
         callbacks=[checkpointer],
-        validation_data=(X_test, y_test),
+        validation_data=(X_test, [y_start, y_end]),
         verbose=VERBOSE_LEVEL)
 
 if __name__ == '__main__':

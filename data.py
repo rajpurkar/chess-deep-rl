@@ -374,7 +374,7 @@ class Dataset:
                         A_from = []
                         A_to = []
                         idx_batch = 0
-                        yield np.array(S_shuffle), np.array(A_from_shuffle), np.array(A_to_shuffle)
+                        yield np.array(S_shuffle), [np.array(A_from_shuffle), np.array(A_to_shuffle)]
 
     def random_white_state(self):
         """
