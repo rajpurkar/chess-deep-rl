@@ -269,7 +269,11 @@ class Dataset:
         - action: np.array [6 pieces x 1] representing piece type
             - piece type: p n b r q k
         """
+        BATCH_SIZE = 32
+        idx_batch = 0
         with open(self.filename) as pgn:
+            S = []
+            A = []
             while True:
                 game = chess.pgn.read_game(pgn)
                 if game is None:
@@ -289,8 +293,6 @@ class Dataset:
                 if "forfeit" in last_node.comment:
                     continue
 
-                S = []
-                A = []
                 while node.variations:
                     s = state_from_board(board, featurized=False)
                     move = node.variations[0].move
@@ -317,14 +319,17 @@ class Dataset:
 
                     S.append(s)
                     A.append(a)
+                    idx_batch += 1
 
-                # Shuffle moves in game
-                idx = list(np.random.permutation(len(S)))
-                S_shuffle = [S[i] for i in idx]
-                A_shuffle = [A[i] for i in idx]
-
-                for s, a in zip(S_shuffle, A_shuffle):
-                    yield s.reshape((1, *s.shape)), a.reshape((1, *a.shape))
+                    if idx_batch == BATCH_SIZE:
+                        # Shuffle moves in game
+                        idx = list(np.random.permutation(len(S)))
+                        S_shuffle = [S[i] for i in idx]
+                        A_shuffle = [A[i] for i in idx]
+                        S = []
+                        A = []
+                        idx_batch = 0
+                        yield np.array(S_shuffle), np.array(A_shuffle)
 
     def random_white_state(self):
         """
