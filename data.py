@@ -291,11 +291,15 @@ class Dataset:
                 S = []
                 A = []
                 while node.variations:
-                    s = state_from_board(board, featurized=True)
+                    s = state_from_board(board, featurized=False)
                     move = node.variations[0].move
                     (piece_type, from_square, to_square) = action_from_board(board, move)
-                    a = np.zeros((NUM_PIECES,))
-                    a[piece_type - 1] = 1
+                    # a = np.zeros((NUM_PIECES,))
+                    # a[piece_type - 1] = 1
+                    a = np.zeros((NUM_ROWS, NUM_COLS))
+                    row = NUM_ROWS - 1 - (from_square // NUM_ROWS)
+                    col = from_square % NUM_ROWS
+                    a[row,col] = 1
 
                     # Play white
                     board.push(move)
@@ -313,10 +317,11 @@ class Dataset:
                     A.append(a)
 
                 # Shuffle moves in game
-                random.shuffle(S)
-                random.shuffle(A)
+                idx = list(np.random.permutation(len(S)))
+                S_shuffle = [S[i] for i in idx]
+                A_shuffle = [A[i] for i in idx]
 
-                for s, a in zip(S, A):
+                for s, a in zip(S_shuffle, A_shuffle):
                     yield s.reshape((1, *s.shape)), a.reshape((1, *a.shape))
 
     def random_white_state(self):
