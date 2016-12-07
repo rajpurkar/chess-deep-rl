@@ -85,8 +85,8 @@ def featurized_state_from_board(board):
     # Knights
     knights = apply_mask(board.knights)
     phi_knights = (np.zeros((NUM_ROWS, NUM_COLS)), np.zeros((NUM_ROWS, NUM_COLS)), np.zeros((NUM_ROWS, NUM_COLS)), np.zeros((NUM_ROWS, NUM_COLS)))
-    idx_knight = ([(row,col) for row in (2,-2) for col in (1,-1)] + \
-                  [(row,col) for row in (1,-1) for col in (2,-2)],)
+    idx_knight = tuple([[(row,col)] for row in (2,-2) for col in (1,-1)] + \
+                       [[(row,col)] for row in (1,-1) for col in (2,-2)])
 
     # Rooks
     rooks = apply_mask(board.rooks)
@@ -145,7 +145,8 @@ def featurized_state_from_board(board):
                             if add_to(phi_pieces[3], pieces[OTHER_BLACK], (row+idx[0], col+idx[1])):
                                 break
 
-    phi = np.array([*phi_knights, *phi_rooks, *phi_bishops, *phi_queens, free_spaces])
+    # phi = np.array([*phi_knights, *phi_rooks, *phi_bishops, *phi_queens, free_spaces])
+    phi = np.array([*phi_rooks, *phi_bishops, *phi_queens, free_spaces])
     return np.append(state, phi, axis=0)
 
 def action_from_board(board, move):
@@ -178,6 +179,7 @@ class Dataset:
     def pickle(self, generator):
         X = []
         Y = []
+        print("Pickling data:")
         for x, y in tqdm(getattr(self, generator)()):
             X.append(x)
             Y.append(y)
@@ -277,7 +279,11 @@ class Dataset:
             while True:
                 game = chess.pgn.read_game(pgn)
                 if game is None:
-                    break
+                    print("\n******************************************")
+                    print("********** LOOPING OVER DATASET **********")
+                    print("******************************************\n")
+                    pgn.seek(0)
+                    continue
 
                 num_moves = int(game.headers["PlyCount"])
                 board = game.board()
