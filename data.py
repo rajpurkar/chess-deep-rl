@@ -175,19 +175,19 @@ class Dataset:
         self.num_games = 0
         # self.idx_moves = []
 
-    def load(self, generator, refresh=False):
+    def load(self, generator, featurized=True, refresh=False):
         assert(type(generator) == str)
 
         if refresh:
-            return self.pickle(generator)
+            return self.pickle(generator, featurized=featurized)
 
         try:
-            X_y = self.unpickle(generator)
+            X_y = self.unpickle(generator, featurized=featurized)
         except:
-            X_y = self.pickle(generator)
+            X_y = self.pickle(generator, featurized=featurized)
         return X_y
 
-    def pickle(self, generator):
+    def pickle(self, generator, featurized):
         X = []
         Y1 = []
         Y2 = []
@@ -201,10 +201,10 @@ class Dataset:
                 Y1.append(y)
 
         X = np.concatenate(X)
-        np.save(self.filename + "." + generator + ".X.npy", X)
+        np.save(self.filename + "." + generator + "-" + str(featurized) + "-X.npy", X)
 
         Y1 = np.concatenate(Y1)
-        np.save(self.filename + "." + generator + ".y.npy", Y1)
+        np.save(self.filename + "." + generator + "-" + str(featurized) + "-y.npy", Y1)
         if not Y2:
             return X, Y1
 
@@ -212,11 +212,11 @@ class Dataset:
         np.save(self.filename + "." + generator + ".y2.npy", Y2)
         return X, [Y1, Y2]
 
-    def unpickle(self, generator):
-        X = np.load(self.filename + "." + generator + ".X.npy")
-        Y1 = np.load(self.filename + "." + generator + ".y.npy")
+    def unpickle(self, generator, featurized):
+        X = np.load(self.filename + "." + generator + "-" + str(featurized) + "-X.npy")
+        Y1 = np.load(self.filename + "." + generator + "-" + str(featurized) + "-y.npy")
         try:
-            Y2 = np.load(self.filename + "." + generator + ".y2.npy")
+            Y2 = np.load(self.filename + "." + generator + "-" + str(featurized) + "-y2.npy")
         except:
             return X, Y1
         return X, [Y1, Y2]
