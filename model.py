@@ -46,7 +46,7 @@ def common_network(**kwargs):
         nb_col=1,
         init='uniform',
         border_mode='same',
-        bias=True)(conv_input)
+        bias=True)(conv_start)
 
     flattened = Flatten()(one_channel_conv)
     return conv_input, flattened
