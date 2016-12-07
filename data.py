@@ -49,7 +49,8 @@ def state_from_board(board, hashable=False, featurized=False):
 
 def featurized_state_from_board(board):
     def bitmap_to_array(bitmap):
-        return np.array([int(i) for i in bin(bitmap)[2:].zfill(NUM_SQUARES)]).reshape(NUM_ROWS, NUM_COLS)
+        bitmap = bin(bitmap)[2:].zfill(NUM_SQUARES)
+        return np.array([int(i) for i in reversed(bitmap)]).reshape(NUM_ROWS, NUM_COLS)
 
     def get(arr, idx):
         try:
@@ -96,8 +97,6 @@ def featurized_state_from_board(board):
                 [(0,col) for col in range(NUM_COLS)], \
                 [(-row,0) for row in range(1,NUM_ROWS)], \
                 [(0,-col) for col in range(1,NUM_COLS)])
-    # idx_rook = [(row,0) for row in range(-NUM_ROWS+1, NUM_ROWS)] + \
-    #            [(0,col) for col in range(-NUM_COLS+1, NUM_COLS)]
 
     # Bishops
     bishops = apply_mask(board.bishops)
@@ -106,8 +105,6 @@ def featurized_state_from_board(board):
                   [(-row,row) for row in range(NUM_ROWS)], \
                   [(-row,-row) for row in range(1,NUM_ROWS)], \
                   [(row,-row) for row in range(1,NUM_ROWS)])
-    # idx_bishop = [(row,row) for row in range(-NUM_ROWS+1, NUM_ROWS)] + \
-    #              [(row,-row) for row in range(-NUM_ROWS+1, NUM_ROWS)]
 
     # Queens
     queens = apply_mask(board.queens)
