@@ -72,6 +72,7 @@ def featurized_state_from_board(board):
     white_pieces = bitmap_to_array(pieces & board.occupied_co[chess.WHITE])
     black_pieces = bitmap_to_array(pieces & board.occupied_co[chess.BLACK])
     free_spaces = bitmap_to_array(~np.uint64(pieces))
+    white_king = bitmap_to_array(board.kings & board.occupied_co[chess.WHITE])
 
     WHITE, BLACK, OTHER_WHITE, OTHER_BLACK = (0, 1, 2, 3)
     def apply_mask(mask):
@@ -191,16 +192,14 @@ class Dataset:
         Y1 = []
         Y2 = []
         print("Pickling data:")
-        for X_y in tqdm(getattr(self, generator)(loop=False)):
-            if len(X_y) == 2:
-                x, y = X_y
-                X.append(x)
-                Y.append(y)
-            elif len(X_y) == 3:
-                x, y1, y2 = X_y
-                X.append(x)
-                Y1.append(y1)
-                Y2.append(y2)
+        for x, y in tqdm(getattr(self, generator)(loop=False)):
+            X.append(x)
+            if type(y) is list:
+                Y1.append(y[0])
+                Y2.append(y[1])
+            else:
+                Y1.append(y)
+
         X = np.concatenate(X)
         np.save(self.filename + "." + generator + ".X.npy", X)
 
@@ -211,7 +210,7 @@ class Dataset:
 
         Y2 = np.concatenate(Y2)
         np.save(self.filename + "." + generator + ".y2.npy", Y2)
-        return X, Y1, Y2
+        return X, [Y1, Y2]
 
     def unpickle(self, generator):
         X = np.load(self.filename + "." + generator + ".X.npy")
@@ -220,7 +219,7 @@ class Dataset:
             Y2 = np.load(self.filename + "." + generator + ".y2.npy")
         except:
             return X, Y1
-        return X, Y1, Y2
+        return X, [Y1, Y2]
 
     def white_sarsa(self):
         with open(self.filename) as pgn:
@@ -290,17 +289,8 @@ class Dataset:
 
                 yield s, a, r, s_prime, a_prime, new_game
 
-    def white_phi_fromaction_sl(self, loop=False):
-        return self.white_state_action_sl(from_board=True, loop=loop, featurized=True)
-
-    def white_phi_toaction_sl(self, loop=False):
-        return self.white_state_action_sl(from_board=False, loop=loop, featurized=True)
-
-    def white_state_fromaction_sl(self, loop=False):
-        return self.white_state_action_sl(from_board=True, loop=loop)
-
-    def white_state_toaction_sl(self, loop=False):
-        return self.white_state_action_sl(from_board=False, loop=loop)
+    def white_phi_action_sl(self, loop=False):
+        return self.white_state_action_sl(loop=loop, featurized=True)
 
     def white_state_action_sl(self, loop=True, featurized=False):
         """
@@ -308,8 +298,7 @@ class Dataset:
         - state: np.array [12 pieces x 64 squares]
             - piece order:  wp wn wb wr wq wk bp bn bb br bq bk
             - square order: a1 b1 c1 ... h8
-        - action: np.array [6 pieces x 1] representing piece type
-            - piece type: p n b r q k
+        - action: [np.array [1 x 64 squares], np.array [1 x 64 squares]] representing [from_board, to_board]
         """
         BATCH_SIZE = 32
         idx_batch = 0
@@ -351,6 +340,87 @@ class Dataset:
                     board.push(move)
 
                     # Play black
+                    node = node.variations[0]
+                    if node.variations:
+                        move = node.variations[0].move
+                        board.push(move)
+
+                        if node.variations:
+                            node = node.variations[0]
+
+                    S.append(s)
+                    A_from.append(a_from)
+                    A_to.append(a_to)
+                    idx_batch += 1
+
+                    if idx_batch == BATCH_SIZE:
+                        # Shuffle moves in game
+                        idx = list(np.random.permutation(len(S)))
+                        S_shuffle = [S[i] for i in idx]
+                        A_from_shuffle = [A_from[i] for i in idx]
+                        A_to_shuffle = [A_to[i] for i in idx]
+                        S = []
+                        A_from = []
+                        A_to = []
+                        idx_batch = 0
+                        yield np.array(S_shuffle), [np.array(A_from_shuffle), np.array(A_to_shuffle)]
+
+    def black_phi_action_sl(self, loop=False):
+        return self.white_state_action_sl(loop=loop, featurized=True)
+
+    def black_state_action_sl(self, loop=True, featurized=False):
+        """
+        Returns (state, action) tuple from black's perspective
+        - state: np.array [12 pieces x 64 squares]
+            - piece order:  wp wn wb wr wq wk bp bn bb br bq bk
+            - square order: a1 b1 c1 ... h8
+        - action: [np.array [1 x 64 squares], np.array [1 x 64 squares]] representing [from_board, to_board]
+        """
+        BATCH_SIZE = 32
+        idx_batch = 0
+        with open(self.filename) as pgn:
+            S = []
+            A_from = []
+            A_to = []
+            while True:
+                game = chess.pgn.read_game(pgn)
+                if game is None:
+                    if not loop:
+                        break
+                    print("\n******************************************")
+                    print("********** LOOPING OVER DATASET **********")
+                    print("******************************************\n")
+                    pgn.seek(0)
+                    continue
+
+                num_moves = int(game.headers["PlyCount"])
+                board = game.board()
+                node = game.root()
+
+                if num_moves <= 5:
+                    continue
+
+                # Make sure game was played all the way through
+                last_node = game.root()
+                while last_node.variations:
+                    last_node = last_node.variations[0]
+                if "forfeit" in last_node.comment:
+                    continue
+
+                # Play white
+                move = node.variations[0].move
+                board.push(move)
+                node = node.variations[0]
+
+                while node.variations:
+                    s = state_from_board(board, featurized=featurized)
+                    move = node.variations[0].move
+                    a_from, a_to = action_from_board(board, move)
+
+                    # Play black
+                    board.push(move)
+
+                    # Play white
                     node = node.variations[0]
                     if node.variations:
                         move = node.variations[0].move
@@ -551,109 +621,3 @@ class Dataset:
             S = np.array(S)
             A = np.array(A)
             return S, A
-
-    # def load_games(self):
-    #     with open(self.filename) as pgn:
-    #         self.games = []
-    #         while True:
-    #             game = chess.pgn.read_game(pgn)
-    #             if game is None:
-    #                 break
-
-    #             num_moves = int(game.headers["PlyCount"])
-    #             if num_moves < 2:
-    #                     continue
-
-    #             self.games.append(game)
-    #         self.num_games = len(self.games)
-    #         self.idx_game = 0
-
-    # def pickle_games(self, filename):
-    #     with open("filename", "w") as f:
-    #         p = pickle.Pickler(f)
-    #         p.dump(self.games)
-
-    # def unpickle_games(self, filename):
-    #     with open("filename", "w") as f:
-    #         up = pickle.Unpickler(f)
-    #         self.games = up.load()
-
-    # def set_batch_size(self, batch_size):
-    #     self.batch_size = batch_size
-    #     self.num_batches = self.num_games // self.batch_size
-
-    # def random_black_state_batch(self):
-    #     for idx_batch in range(self.num_batches):
-    #         X = []
-    #         y = []
-    #         for i in np.random.permutation(self.batch_size):
-    #             game = self.games[self.batch_size * idx_batch + i]
-    #             state, reward = self.fetch_black_state(game)
-    #             X.append(state)
-    #             y.append(reward)
-    #         X = np.array(X)
-    #         y = np.array(y)
-    #         yield X, y
-
-    # def fetch_black_state(self, game):
-    #     num_moves = int(game.headers["PlyCount"])
-    #     if num_moves < 2:
-    #         return
-    #     # Choose a random black-turn state
-    #     idx_move = random.randint(1, int(num_moves / 2)) * 2 - 1
-    #     moves_remaining = num_moves - idx_move
-
-    #     # Play moves up to idx_move
-    #     board = game.board()
-    #     node = game.root()
-    #     for i in range(idx_move):
-    #         board.push(node.variations[0].move)
-    #         node = node.variations[0]
-
-    #     # headers["Result"]: {"0-1", "1-0", "1/2-1/2"}
-    #     # result: {-1, 0, 1}
-    #     # Parse result from header
-    #     white_score = game.headers["Result"].split("-")[0].split("/")
-    #     if len(white_score) == 1:
-    #         result = 2 * int(white_score[0]) - 1
-    #     else:
-    #         result = 0
-
-    #     state = np.zeros((1, NUM_COLORS * NUM_PIECES, NUM_ROWS, NUM_COLS))
-    #     for piece_type in chess.PIECE_TYPES:
-    #         for color in chess.COLORS:
-    #             pieces = bin(board.pieces(piece_type, color))
-    #             for i, piece in enumerate(reversed(pieces)):
-    #                 if piece == 'b':
-    #                     break
-    #                 elif piece == '1':
-    #                     row = i // NUM_ROWS
-    #                     col = i % NUM_ROWS
-    #                     state[0, (1-color)*NUM_PIECES + piece_type - 1, row, col] = 1
-
-    #     return state, np.array([(GAMMA ** moves_remaining) * result])
-
-    # def random_black_state(self):
-    #     """
-    #     Returns (state, reward, moves_remaining) tuple at black's turn from white's perspective
-    #     - state: np.array [12 pieces x 8 rows x 8 cols]
-    #         - piece order:  wp wn wb wr wq wk bp bn bb br bq bk
-    #         - row order: a b c ... h
-    #         - col order: 1 2 3 ... 8
-    #     - result: {-1, 0, 1} (lose, draw, win)
-    #     - moves_remaining: number of moves left to the end of the game
-    #     """
-    #     with open(self.filename) as pgn:
-    #         while True:
-    #             if self.games:
-    #                 if self.idx_game >= self.num_games:
-    #                     break
-
-    #                 game = self.games[self.idx_game]
-    #                 self.idx_game += 1
-    #             else:
-    #                 game = chess.pgn.read_game(pgn)
-    #                 if game is None:
-    #                     break
-
-    #             yield self.fetch_black_state(game)
