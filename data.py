@@ -179,10 +179,10 @@ class Dataset:
         X = []
         Y = []
         for x, y in tqdm(getattr(self, generator)()):
-            X.append(np.squeeze(x))
-            Y.append(np.squeeze(y))
-        X = np.array(X)
-        Y = np.array(Y)
+            X.append(x)
+            Y.append(y)
+        X = np.concatenate(X)
+        Y = np.concatenate(Y)
         np.save(self.filename + "." + generator + ".X.npy", X)
         np.save(self.filename + "." + generator + ".y.npy", Y)
         return X, Y
