@@ -1,8 +1,8 @@
 from data import Dataset
 
-# d = Dataset("data/small.pgn")
+d = Dataset("data/small.pgn")
 # d = Dataset("data/STS1.epd")
-d = Dataset("data/medium.pgn")
+# d = Dataset("data/medium.pgn")
 # d = Dataset("data/CCRL-4040.[671444].pgn")
 # d = Dataset("data/ficsgamesdb_1999-2015_standard2000_nomovetimes.pgn")
 
@@ -14,8 +14,9 @@ d = Dataset("data/medium.pgn")
 # X, y = d.strategic_test_suite()
 # print(X.shape, y.shape)
 
-for state, action in d.white_state_action_sl():
-    print(state.shape, action.shape)
+X, y = d.load("white_state_action_sl")
+# for state, action in d.white_state_action_sl():
+#     print(state.shape, action.shape)
 
 # import chess
 # import chess.pgn

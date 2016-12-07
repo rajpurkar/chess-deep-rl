@@ -146,15 +146,24 @@ def featurized_state_from_board(board):
                                 break
 
     # phi = np.array([*phi_knights, *phi_rooks, *phi_bishops, *phi_queens, free_spaces])
-    phi = np.array([*phi_rooks, *phi_bishops, *phi_queens, free_spaces])
+    phi = np.array([*phi_rooks, *phi_bishops, *phi_queens, white_pieces, black_pieces, free_spaces])
     return np.append(state, phi, axis=0)
 
-def action_from_board(board, move):
+def action_from_board(board, move, from_board=True):
     if type(move) is chess.Move:
         # piece - 1: pawn, 2: knight, 3: bishop, 4: rook, 5: queen, 6: king
-        piece = board.piece_at(move.from_square).piece_type
+        # piece = board.piece_at(move.from_square).piece_type
+
         # square order - a1 b1 ... h1 a2 ... h2 ... h8
-        return (piece, move.from_square, move.to_square)
+        a = np.zeros((NUM_ROWS, NUM_COLS))
+        if from_board:
+            idx_square = move.from_square
+        else:
+            idx_square = move.to_square
+        row = NUM_ROWS - 1 - (idx_square // NUM_ROWS)
+        col = idx_square % NUM_ROWS
+        a[row,col] = 1
+        return a.reshape((NUM_SQUARES,))
 
 class Dataset:
     def __init__(self, filename, loop=False):
@@ -262,7 +271,19 @@ class Dataset:
 
                 yield s, a, r, s_prime, a_prime, new_game
 
-    def white_state_action_sl(self):
+    def white_phi_fromaction_sl(self, loop=False):
+        return self.white_state_action_sl(from_board=True, loop=loop, featurized=True)
+
+    def white_phi_toaction_sl(self, loop=False):
+        return self.white_state_action_sl(from_board=False, loop=loop, featurized=True)
+
+    def white_state_fromaction_sl(self, loop=False):
+        return self.white_state_action_sl(from_board=True, loop=loop)
+
+    def white_state_toaction_sl(self, loop=False):
+        return self.white_state_action_sl(from_board=False, loop=loop)
+
+    def white_state_action_sl(self, from_board=True, loop=False, featurized=False):
         """
         Returns (state, action) tuple from white's perspective
         - state: np.array [12 pieces x 64 squares]
@@ -279,6 +300,8 @@ class Dataset:
             while True:
                 game = chess.pgn.read_game(pgn)
                 if game is None:
+                    if not loop:
+                        break
                     print("\n******************************************")
                     print("********** LOOPING OVER DATASET **********")
                     print("******************************************\n")
@@ -300,16 +323,9 @@ class Dataset:
                     continue
 
                 while node.variations:
-                    s = state_from_board(board, featurized=False)
+                    s = state_from_board(board, featurized=featurized)
                     move = node.variations[0].move
-                    (piece_type, from_square, to_square) = action_from_board(board, move)
-                    # a = np.zeros((NUM_PIECES,))
-                    # a[piece_type - 1] = 1
-                    a = np.zeros((NUM_ROWS, NUM_COLS))
-                    row = NUM_ROWS - 1 - (from_square // NUM_ROWS)
-                    col = from_square % NUM_ROWS
-                    a[row,col] = 1
-                    a = a.reshape((NUM_SQUARES,))
+                    a = action_from_board(board, move, from_board)
 
                     # Play white
                     board.push(move)
