@@ -3,6 +3,7 @@ import random
 import chess
 import chess.pgn
 import numpy as np
+import itertools
 
 NUM_PIECES = len(chess.PIECE_TYPES)
 NUM_COLORS = len(chess.COLORS)
@@ -13,55 +14,137 @@ NUM_ROWS = 8
 GAMMA = 0.99
 
 def state_from_board(board, hashable=False, featurized=False):
-    if not featurized:
-        if not hashable:
-            state = np.zeros((NUM_COLORS * NUM_PIECES, NUM_ROWS, NUM_COLS))
-            for piece_type in chess.PIECE_TYPES:
-                for color in chess.COLORS:
-                    pieces = bin(board.pieces(piece_type, color))
-                    for i, piece in enumerate(reversed(pieces)):
-                        if piece == 'b':
-                            break
-                        elif piece == '1':
-                            row = i // NUM_ROWS
-                            col = i % NUM_ROWS
-                            state[(1-color)*NUM_PIECES + piece_type - 1, row, col] = 1
-        else:
-            state = [0] * NUM_SQUARES
-            for piece_type in chess.PIECE_TYPES:
-                for color in chess.COLORS:
-                    pieces = bin(board.pieces(piece_type, color))
-                    for i, piece in enumerate(reversed(pieces)):
-                        if piece == 'b':
-                            break
-                        elif piece == '1':
-                            state[i] = (1-color)*NUM_PIECES + piece_type - 1
-                            # row = i // NUM_ROWS
-                            # col = i % NUM_ROWS
-                            # state[row, col] = (1-color)*NUM_PIECES + piece_type - 1
-            state = str(state)
+    if featurized:
+        return featurized_state_from_board(board)
+
+    if not hashable:
+        state = np.zeros((NUM_COLORS * NUM_PIECES, NUM_ROWS, NUM_COLS))
+        for piece_type in chess.PIECE_TYPES:
+            for color in chess.COLORS:
+                pieces = bin(board.pieces(piece_type, color))
+                for i, piece in enumerate(reversed(pieces)):
+                    if piece == 'b':
+                        break
+                    elif piece == '1':
+                        row = i // NUM_ROWS
+                        col = i % NUM_ROWS
+                        state[(1-color)*NUM_PIECES + piece_type - 1, row, col] = 1
     else:
-        def bitmap_to_array(bitmap):
-            return np.array([int(i) for i in bin(bitmap)[2:].zfill(NUM_SQUARES)]).reshape(NUM_ROWS, NUM_COLS)
-        state = state_from_board(board)
-        pieces = board.pawns | board.knights | board.bishops | board.rooks | board.queens | board.kings
-        # Knights
-        white_knights = board.knights & board.occupied_co[chess.WHITE]
-        black_knights = board.knights & board.occupied_co[chess.BLACK]
-        non_knights = pieces & (~board.knights)
-        white_non_knights = non_knights & board.occupied_co[chess.WHITE]
-        white_non_knights = non_knights & board.occupied_co[chess.BLACK]
-
-        arr_white_knights = bitmap_to_array(white_knights)
-        arr_black_knights = bitmap_to_array(black_knights)
-        arr_non_white_knights = bitmap_to_array(non_white_knights)
-        arr_non_black_knights = bitmap_to_array(non_black_knights)
-        print(arr_white_knights)
-        print(bin(white_knights))
-        print(bin(black_knights))
-        return pieces
-
+        state = [0] * NUM_SQUARES
+        for piece_type in chess.PIECE_TYPES:
+            for color in chess.COLORS:
+                pieces = bin(board.pieces(piece_type, color))
+                for i, piece in enumerate(reversed(pieces)):
+                    if piece == 'b':
+                        break
+                    elif piece == '1':
+                        state[i] = (1-color)*NUM_PIECES + piece_type - 1
+                        # row = i // NUM_ROWS
+                        # col = i % NUM_ROWS
+                        # state[row, col] = (1-color)*NUM_PIECES + piece_type - 1
+        state = str(state)
     return state
+
+def featurized_state_from_board(board):
+    def bitmap_to_array(bitmap):
+        return np.array([int(i) for i in bin(bitmap)[2:].zfill(NUM_SQUARES)]).reshape(NUM_ROWS, NUM_COLS)
+
+    def get(arr, idx):
+        try:
+            return arr[idx]
+        except:
+            return 0
+
+    def add_to(arr_dst, arr_src, idx):
+        for i, val in enumerate(idx):
+            if val < 0 or val >= arr_dst.shape[i]:
+                return False
+        try:
+            arr_dst[idx] += arr_src[idx]
+            return arr_src[idx] != 0.0
+        except:
+            return False
+
+    state = state_from_board(board)
+    pieces = board.pawns | board.knights | board.bishops | board.rooks | board.queens | board.kings
+    white_pieces = bitmap_to_array(pieces & board.occupied_co[chess.WHITE])
+    black_pieces = bitmap_to_array(pieces & board.occupied_co[chess.BLACK])
+    free_spaces = bitmap_to_array(~np.uint64(pieces))
+
+    WHITE, BLACK, OTHER_WHITE, OTHER_BLACK = (0, 1, 2, 3)
+    def apply_mask(mask):
+        non_mask = pieces & (~mask)
+        white_mask = bitmap_to_array(mask & board.occupied_co[chess.WHITE])
+        black_mask = bitmap_to_array(mask & board.occupied_co[chess.BLACK])
+        white_non_mask = bitmap_to_array(non_mask & board.occupied_co[chess.WHITE])
+        black_non_mask = bitmap_to_array(non_mask & board.occupied_co[chess.BLACK])
+        return white_mask, black_mask, white_non_mask, black_non_mask
+
+    # Knights
+    knights = apply_mask(board.knights)
+    phi_knights = (np.zeros((NUM_ROWS, NUM_COLS)), np.zeros((NUM_ROWS, NUM_COLS)), np.zeros((NUM_ROWS, NUM_COLS)), np.zeros((NUM_ROWS, NUM_COLS)))
+    idx_knight = ([(row,col) for row in (2,-2) for col in (1,-1)] + \
+                  [(row,col) for row in (1,-1) for col in (2,-2)],)
+
+    # Rooks
+    rooks = apply_mask(board.rooks)
+    phi_rooks = (np.zeros((NUM_ROWS, NUM_COLS)), np.zeros((NUM_ROWS, NUM_COLS)), np.zeros((NUM_ROWS, NUM_COLS)), np.zeros((NUM_ROWS, NUM_COLS)))
+    idx_rook = ([(row,0) for row in range(NUM_ROWS)], \
+                [(0,col) for col in range(NUM_COLS)], \
+                [(-row,0) for row in range(1,NUM_ROWS)], \
+                [(0,-col) for col in range(1,NUM_COLS)])
+    # idx_rook = [(row,0) for row in range(-NUM_ROWS+1, NUM_ROWS)] + \
+    #            [(0,col) for col in range(-NUM_COLS+1, NUM_COLS)]
+
+    # Bishops
+    bishops = apply_mask(board.bishops)
+    phi_bishops = (np.zeros((NUM_ROWS, NUM_COLS)), np.zeros((NUM_ROWS, NUM_COLS)), np.zeros((NUM_ROWS, NUM_COLS)), np.zeros((NUM_ROWS, NUM_COLS)))
+    idx_bishop = ([(row,row) for row in range(NUM_ROWS)], \
+                  [(-row,row) for row in range(NUM_ROWS)], \
+                  [(-row,-row) for row in range(1,NUM_ROWS)], \
+                  [(row,-row) for row in range(1,NUM_ROWS)])
+    # idx_bishop = [(row,row) for row in range(-NUM_ROWS+1, NUM_ROWS)] + \
+    #              [(row,-row) for row in range(-NUM_ROWS+1, NUM_ROWS)]
+
+    # Queens
+    queens = apply_mask(board.queens)
+    phi_queens = (np.zeros((NUM_ROWS, NUM_COLS)), np.zeros((NUM_ROWS, NUM_COLS)), np.zeros((NUM_ROWS, NUM_COLS)), np.zeros((NUM_ROWS, NUM_COLS)))
+    idx_queen = idx_rook + idx_bishop
+
+    piece_tuples = [(knights, phi_knights, idx_knight), \
+                    (rooks, phi_rooks, idx_rook), \
+                    (bishops, phi_bishops, idx_bishop), \
+                    (queens, phi_queens, idx_queen)]
+
+    for row in range(NUM_ROWS):
+        for col in range(NUM_COLS):
+            for pieces, phi_pieces, idx_piece in piece_tuples:
+                for direction in idx_piece:
+                    if pieces[WHITE][row,col]:
+                        for idx in direction:
+                            if get(black_pieces, (row+idx[0], col+idx[1])):
+                                break
+                            if add_to(phi_pieces[0], pieces[OTHER_WHITE], (row+idx[0], col+idx[1])):
+                                break
+                        for idx in direction:
+                            if get(white_pieces, (row+idx[0], col+idx[1])):
+                                break
+                            if add_to(phi_pieces[1], pieces[OTHER_BLACK], (row+idx[0], col+idx[1])):
+                                break
+                    if pieces[BLACK][row,col]:
+                        for idx in direction:
+                            if get(black_pieces, (row+idx[0], col+idx[1])):
+                                break
+                            if add_to(phi_pieces[2], pieces[OTHER_WHITE], (row+idx[0], col+idx[1])):
+                                break
+                        for idx in direction:
+                            if get(white_pieces, (row+idx[0], col+idx[1])):
+                                break
+                            if add_to(phi_pieces[3], pieces[OTHER_BLACK], (row+idx[0], col+idx[1])):
+                                break
+
+    phi = np.array([*phi_knights, *phi_rooks, *phi_bishops, *phi_queens, free_spaces])
+    return np.append(state, phi, axis=0)
 
 def action_from_board(board, move):
     if type(move) is chess.Move:
