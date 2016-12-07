@@ -2,21 +2,27 @@ import time
 import os
 import argparse
 from data import Dataset
+import numpy as np
+np.random.seed(20)
 
 FOLDER_TO_SAVE = "./saved/"
 NUMBER_EPOCHS = 10000  # some large number
-SAMPLES_PER_EPOCH = 50016  # tune for feedback/speed balance
+SAMPLES_PER_EPOCH = 10016  # tune for feedback/speed balance
 VERBOSE_LEVEL = 1
 
 
 def common_network(**kwargs):
     from keras.layers.convolutional import Convolution2D
     from keras.layers import Input, Flatten
+    from keras.layers.core import Activation
+    from keras.layers.normalization import BatchNormalization
+    from keras.layers.advanced_activations import PReLU
     defaults = {
         "board": 8,
         "board_depth": 12,
-        "layers": 5,
-        "num_filters": 100
+        "layers": 4,
+        "num_filters": 64,
+        "one_convolve": False,
     }
     params = defaults
     params.update(kwargs)
@@ -30,9 +36,9 @@ def common_network(**kwargs):
     for i in range(0, params["layers"]):
         # use filter_width_K if it is there, otherwise use 3
         filter_key = "filter_width_%d" % i
-        filter_width = params.get(filter_key, 1 + i*2)
+        filter_width = params.get(filter_key, 3)
         num_filters = params["num_filters"]
-        if i == params["layers"] - 1:
+        if i == params["layers"] - 1 and params["one_convolve"] is True:
             filter_width = 1
             num_filters = 1
         conv_start = Convolution2D(
@@ -40,9 +46,10 @@ def common_network(**kwargs):
             nb_row=filter_width,
             nb_col=filter_width,
             init='he_normal',
-            activation='relu',
             border_mode='same')(conv_start)
-
+        # conv_start = Activation('relu')(conv_start)
+        conv_start = BatchNormalization()(conv_start)
+        conv_start = PReLU()(conv_start)
     flattened = Flatten()(conv_start)
     return conv_input, flattened
 
@@ -63,7 +70,8 @@ def policy_network(**kwargs):
     from keras.models import Model
     from keras.layers import Dense
     conv_input, flattened = common_network(**kwargs)
-    dense_3 = Dense(64, activation="relu")(flattened)
+    # dense_3 = Dense(64, activation="relu", init="he_normal")(flattened)
+    dense_3 = flattened
     output = Dense(64, activation="softmax")(dense_3)
     model = Model(conv_input, output)
     model.compile('adam', 'categorical_crossentropy', metrics=['accuracy'])
@@ -79,7 +87,7 @@ def get_filename_for_saving(net_type, start_time):
 
 def train(net_type):
     from keras.callbacks import ModelCheckpoint
-    d = Dataset('data/medium.pgn')
+    d = Dataset('data/large-fics.pgn')
     start_time = str(int(time.time()))
     checkpointer = ModelCheckpoint(
         filepath=get_filename_for_saving(net_type, start_time),
