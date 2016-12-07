@@ -189,7 +189,7 @@ class Dataset:
         Y1 = []
         Y2 = []
         print("Pickling data:")
-        for x, y in tqdm(getattr(self, generator)(loop=False)):
+        for x, y in tqdm(getattr(self, generator)(featurized=True, loop=False)):
             X.append(x)
             if type(y) is list:
                 Y1.append(y[0])
@@ -206,8 +206,8 @@ class Dataset:
             return X, Y1
 
         Y2 = np.concatenate(Y2)
-        np.save(self.filename + "." + generator + ".y2.npy", Y2)
-        return X, [Y1, Y2]
+        np.save(self.filename + "." + generator + "-" + str(featurized) + "-y2.npy", Y2)
+        return X, Y1, Y2
 
     def unpickle(self, generator, featurized):
         X = np.load(self.filename + "." + generator + "-" + str(featurized) + "-X.npy")
@@ -216,7 +216,7 @@ class Dataset:
             Y2 = np.load(self.filename + "." + generator + "-" + str(featurized) + "-y2.npy")
         except:
             return X, Y1
-        return X, [Y1, Y2]
+        return X, Y1, Y2
 
     def white_sarsa(self):
         with open(self.filename) as pgn:

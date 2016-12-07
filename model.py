@@ -52,7 +52,7 @@ def common_network(**kwargs):
 
 def policy_network(**kwargs):
     from keras.models import Model
-    from keras.layers import Dense, Dropout
+    from keras.layers import Dense, Dropout, merge
     from keras.layers.normalization import BatchNormalization
     from keras.layers.advanced_activations import PReLU
 
@@ -74,12 +74,13 @@ def policy_network(**kwargs):
             dense_mess = Dropout(params["dropout"])(dense_mess)
 
     # output for the first board
-    output1 = Dense(params["output_size"], activation="softmax")(dense_mess)
+    output_from = Dense(params["output_size"], activation="softmax")(dense_mess)
+    merged_output_from = merge([output_from, dense_mess], mode='concat')
 
     # output for the second board
-    output2 = Dense(params["output_size"], activation="softmax")(dense_mess)
+    output_to = Dense(params["output_size"], activation="softmax")(merged_output_from)
 
-    model = Model(conv_input, [output1, output2])
+    model = Model(conv_input, [output_from, output_to])
     model.compile('adam', 'categorical_crossentropy', metrics=['accuracy'])
     return model
 
