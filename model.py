@@ -5,7 +5,7 @@ from data import Dataset
 
 FOLDER_TO_SAVE = "./saved/"
 NUMBER_EPOCHS = 10000  # some large number
-SAMPLES_PER_EPOCH = 10000  # tune for feedback/speed balance
+SAMPLES_PER_EPOCH = 50016  # tune for feedback/speed balance
 VERBOSE_LEVEL = 1
 
 
@@ -31,24 +31,19 @@ def common_network(**kwargs):
         # use filter_width_K if it is there, otherwise use 3
         filter_key = "filter_width_%d" % i
         filter_width = params.get(filter_key, 1 + i*2)
+        num_filters = params["num_filters"]
+        if i == params["layers"] - 1:
+            filter_width = 1
+            num_filters = 1
         conv_start = Convolution2D(
-            nb_filter=params["num_filters"],
+            nb_filter= num_filters,
             nb_row=filter_width,
             nb_col=filter_width,
-            init='uniform',
+            init='he_normal',
             activation='relu',
             border_mode='same')(conv_start)
 
-    # the last layer maps each <filters_per_layer> feature to a number
-    one_channel_conv = Convolution2D(
-        nb_filter=1,
-        nb_row=1,
-        nb_col=1,
-        init='uniform',
-        border_mode='same',
-        bias=True)(conv_start)
-
-    flattened = Flatten()(one_channel_conv)
+    flattened = Flatten()(conv_start)
     return conv_input, flattened
 
 
@@ -68,9 +63,7 @@ def policy_network(**kwargs):
     from keras.models import Model
     from keras.layers import Dense
     conv_input, flattened = common_network(**kwargs)
-    dense_1 = Dense(1000, activation="relu")(flattened)
-    dense_2 = Dense(500, activation="relu")(dense_1)
-    dense_3 = Dense(250, activation="relu")(dense_2)
+    dense_3 = Dense(64, activation="relu")(flattened)
     output = Dense(64, activation="softmax")(dense_3)
     model = Model(conv_input, output)
     model.compile('adam', 'categorical_crossentropy', metrics=['accuracy'])
@@ -100,7 +93,7 @@ def train(net_type):
         model = policy_network()
         generator_str = 'white_state_action_sl'
         generator_fn = d.white_state_action_sl
-    d_test = Dataset('data/medium_test.pgn')
+    d_test = Dataset('data/small_test.pgn')
     (X_test, y_test) = d_test.load(generator_str, refresh=False)
     model.fit_generator(
         generator_fn(),
