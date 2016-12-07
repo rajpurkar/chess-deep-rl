@@ -96,8 +96,8 @@ def train(net_type):
     start_time = str(int(time.time()))
     generator_fn = d.white_state_action_sl
     d_test = Dataset('data/small_test.pgn')
-    X_val, y_from_val, y_to_val = d_test.load('white_state_action_sl', refresh=True)
-    print(X_val[0].shape)
+    featurized = True
+    X_val, y_from_val, y_to_val = d_test.load('white_state_action_sl', featurized=featurized, refresh=False)
     model = policy_network(board_num_channels=X_val[0].shape[0])
     from keras.callbacks import ModelCheckpoint
     checkpointer = ModelCheckpoint(
@@ -105,7 +105,7 @@ def train(net_type):
         verbose=2,
         save_best_only=True)
     model.fit_generator(
-        generator_fn(featurized=True),
+        generator_fn(featurized=featurized),
         samples_per_epoch=SAMPLES_PER_EPOCH,
         nb_epoch=NUMBER_EPOCHS,
         callbacks=[checkpointer],
