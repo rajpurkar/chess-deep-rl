@@ -147,22 +147,18 @@ def featurized_state_from_board(board):
     phi = np.array([*phi_rooks, *phi_bishops, *phi_queens, white_pieces, black_pieces, free_spaces])
     return np.append(state, phi, axis=0)
 
-def action_from_board(board, move):
-    def square_ind_to_sub(idx_square):
-        row = (idx_square // NUM_ROWS)
-        col = idx_square % NUM_ROWS
-        return row, col
-
+def action_from_move(move):
     if type(move) is chess.Move:
-        # piece - 1: pawn, 2: knight, 3: bishop, 4: rook, 5: queen, 6: king
-        # piece = board.piece_at(move.from_square).piece_type
+        a_from = np.zeros((NUM_SQUARES,))
+        a_to = np.zeros((NUM_SQUARES,))
+        a_from[move.from_square] = 1
+        a_to[move.to_square] = 1
+        return (a_from, a_to)
 
-        # square order - a1 b1 ... h1 a2 ... h2 ... h8
-        a_from = np.zeros((NUM_ROWS, NUM_COLS))
-        a_to = np.zeros((NUM_ROWS, NUM_COLS))
-        a_from[square_ind_to_sub(move.from_square)] = 1
-        a_to[square_ind_to_sub(move.to_square)] = 1
-        return (a_from.reshape((NUM_SQUARES,)), a_to.reshape((NUM_SQUARES,)))
+def move_from_action(a_from, a_to):
+    (from_square,) = np.where(a_from==1)
+    (to_square,) = np.where(a_to==1)
+    return chess.Move(from_square[0], to_square[0])
 
 class Dataset:
     def __init__(self, filename, loop=False):
@@ -331,7 +327,7 @@ class Dataset:
                 while node.variations:
                     s = state_from_board(board, featurized=featurized)
                     move = node.variations[0].move
-                    a_from, a_to = action_from_board(board, move)
+                    a_from, a_to = action_from_move(move)
 
                     # Play white
                     board.push(move)
@@ -412,7 +408,7 @@ class Dataset:
                 while node.variations:
                     s = state_from_board(board, featurized=featurized)
                     move = node.variations[0].move
-                    a_from, a_to = action_from_board(board, move)
+                    a_from, a_to = action_from_move(move)
 
                     # Play black
                     board.push(move)
@@ -608,7 +604,7 @@ class Dataset:
 
                 # Convert to state and action representation
                 s = state_from_board(board)
-                (piece_type, from_square, to_square) = action_from_board(board, max_move)
+                (piece_type, from_square, to_square) = action_from_move(max_move)
                 a = np.zeros((NUM_PIECES,))
                 a[piece_type-1] = 1
 

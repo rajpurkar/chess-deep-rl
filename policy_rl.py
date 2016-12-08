@@ -30,9 +30,11 @@ def play(white_engine, black_engine):
     num_black_moves = [0] * NUM_GAMES_PER_BATCH
 
     white_states = [[] for _ in range(NUM_GAMES_PER_BATCH)]
-    white_actions = [[] for _ in range(NUM_GAMES_PER_BATCH)]
+    white_actions_from = [[] for _ in range(NUM_GAMES_PER_BATCH)]
+    white_actions_to = [[] for _ in range(NUM_GAMES_PER_BATCH)]
     black_states = [[] for _ in range(NUM_GAMES_PER_BATCH)]
-    black_actions = [[] for _ in range(NUM_GAMES_PER_BATCH)]
+    black_actions_from = [[] for _ in range(NUM_GAMES_PER_BATCH)]
+    black_actions_to = [[] for _ in range(NUM_GAMES_PER_BATCH)]
     white_scores = [None] * NUM_GAMES_PER_BATCH
     black_scores = [None] * NUM_GAMES_PER_BATCH
 
@@ -51,11 +53,12 @@ def play(white_engine, black_engine):
             break
 
         # Play white
-        X, y, moves = white_engine.search(boards)
+        X, [y_from, y_to], moves = white_engine.search(boards)
         for i, (idx, board) in enumerate(boards.items()):
             board.push(moves[i])
             white_states[idx].append(X[i,:].reshape(1, X.shape[1]))
-            white_actions[idx].append(y[i,:].reshape(1, y.shape[1]))
+            white_actions_from[idx].append(y_from[i,:].reshape(1, y_from.shape[1]))
+            white_actions_to[idx].append(y_to[i,:].reshape(1, y_to.shape[1]))
             num_white_moves[idx] += 1
 
         # Filter out finished games
@@ -72,18 +75,21 @@ def play(white_engine, black_engine):
             break
 
         # Play black
-        X, y, moves = black_engine.search(boards)
+        X, [y_from, y_to], moves = black_engine.search(boards)
         for i, (idx, board) in enumerate(boards.items()):
             board.push(moves[i])
             black_states[idx].append(X[i,:].reshape(1, X.shape[1]))
-            black_actions[idx].append(y[i,:].reshape(1, y.shape[1]))
+            black_actions_from[idx].append(y_from[i,:].reshape(1, y_from.shape[1]))
+            black_actions_to[idx].append(y_to[i,:].reshape(1, y_to.shape[1]))
             num_black_moves[idx] += 1
 
     # Flatten lists
     white_states = [a for game in white_states for a in game]
     black_states = [a for game in black_states for a in game]
-    white_actions = [a for game in white_actions for a in game]
-    black_actions = [a for game in black_actions for a in game]
+    white_actions_from = [a for game in white_actions_from for a in game]
+    white_actions_to = [a for game in white_actions_to for a in game]
+    black_actions_from = [a for game in black_actions_from for a in game]
+    black_actions_to = [a for game in black_actions_to for a in game]
     white_scores = [score for game in white_scores for score in game]
     black_scores = [score for game in black_scores for score in game]
 
@@ -91,16 +97,18 @@ def play(white_engine, black_engine):
     idx = list(np.random.permutation(len(actions)))
     white_states = np.array([white_states[i] for i in idx])
     black_states = np.array([black_states[i] for i in idx])
-    white_actions = np.array([white_actions[i] for i in idx])
-    black_actions = np.array([black_actions[i] for i in idx])
+    white_actions_from = np.array([white_actions_from[i] for i in idx])
+    white_actions_to = np.array([white_actions_to[i] for i in idx])
+    black_actions_from = np.array([black_actions_from[i] for i in idx])
+    black_actions_to = np.array([black_actions_to[i] for i in idx])
     white_scores = np.array([white_scores[i] for i in idx])
     black_scores = np.array([black_scores[i] for i in idx])
 
-    return (white_states, white_actions, white_scores), (black_states, black_actions, black_scores)
+    return (white_states, [white_actions_from, white_actions_to], white_scores), (black_states, [black_actions_from, black_actions_to], black_scores)
 
 def train(engine, X, y, r):
     # TODO
-    pass
+    engine.model.fit(X, y)
 
 if __name__ == "__main__":
     white_engine = PolicyEngine(white_model_hdf5)
