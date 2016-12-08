@@ -8,7 +8,7 @@ np.random.seed(20)
 FOLDER_TO_SAVE = "./saved/"
 NUMBER_EPOCHS = 10000  # some large number
 SAMPLES_PER_EPOCH = 10016  # tune for feedback/speed balance
-VERBOSE_LEVEL = 1
+VERBOSE_LEVEL = 2
 
 
 def build_network(**kwargs):
@@ -23,10 +23,11 @@ def build_network(**kwargs):
         "board_side_length": 8,
         "conv_layers": 4,
         "num_filters": 32,
-        "dropout": 0,
+        "dropout": 0.3,
         "dense_layers": 2,
         "dense_hidden": 64,
-        "output_size": 64
+        "output_size": 64,
+        "conditioned_architecture": True
     }
     params = defaults
     params.update(kwargs)
@@ -67,41 +68,56 @@ def build_network(**kwargs):
         conv_out = conv_wrap(conv_out)
 
     flattened = Flatten()(conv_out)
+
     dense_out = flattened
     for i in range(params["dense_layers"]):
         dense_out = dense_wrap(dense_out)
+    output_from = Dense(params["output_size"], activation="softmax")(dense_out)
 
-    # output for the first board
-    output_pre_activation = Dense(
-        params["output_size"])(dense_out)
-    output_from = Activation('softmax')(output_pre_activation)
+    if params["conditioned_architecture"] is True:
+        output_reshaped = Reshape((1, 8, 8))(output_from)
+        conv_merged = merge(
+            [output_reshaped, conv_input],
+            mode='concat',
+            concat_axis=1)
 
-    # output for the second board
-    output_reshaped = Reshape((1, 8, 8))(output_from)
-    conv_merged = merge(
-        [output_reshaped, conv_input],
-        mode='concat',
-        concat_axis=1)
+        conv_out_2 = conv_merged
+        for i in range(0, params["conv_layers"]):
+            conv_out_2 = conv_wrap(conv_out_2)
+        flattened2 = Flatten()(conv_out_2)
+        dense_out_2 = flattened2
+    else:
+        dense_out_2 = flattened
 
-    conv_out_2 = conv_merged
-    for i in range(0, params["conv_layers"]):
-        conv_out_2 = conv_wrap(conv_out_2)
-    flattened2 = Flatten()(conv_out_2)
-    dense_out = flattened2
     for i in range(params["dense_layers"]):
-        dense_out = dense_wrap(dense_out)
-    output_to = Dense(params["output_size"], activation="softmax")(dense_out)
+        dense_out_2 = dense_wrap(dense_out_2)
+    output_to = Dense(params["output_size"], activation="softmax")(dense_out_2)
 
     model = Model(conv_input, [output_from, output_to])
-    model.compile('adamax', 'categorical_crossentropy', metrics=['accuracy'])
+
+    model.compile('adamax', 'categorical_crossentropy', metrics=['accuracy', 'top_k_categorical_accuracy'])
+    
     return model
 
 
-def get_filename_for_saving(net_type, start_time):
-    folder_name = FOLDER_TO_SAVE + net_type + '/' + start_time
+def get_folder_name(start_time):
+    folder_name = FOLDER_TO_SAVE + 'policy/' + start_time
     if not os.path.exists(folder_name):
         os.makedirs(folder_name)
-    return folder_name + "/{epoch:02d}-{val_loss:.2f}.hdf5"
+    return folder_name
+
+
+def get_filename_for_saving(start_time):
+    return get_folder_name(start_time) + "/{epoch:02d}-{val_loss:.2f}.hdf5"
+
+
+def plot_model(model, start_time):
+    from keras.utils.visualize_util import plot
+    plot(
+        model,
+        to_file=get_folder_name(start_time) + '/model.png',
+        show_shapes=True,
+        show_layer_names=False)
 
 
 def train(net_type):
@@ -115,10 +131,11 @@ def train(net_type):
         featurized=featurized,
         refresh=False)
     model = build_network(board_num_channels=X_val[0].shape[0])
+    plot_model(model, start_time)
     from keras.callbacks import ModelCheckpoint
     checkpointer = ModelCheckpoint(
-        filepath=get_filename_for_saving('policy', start_time),
-        verbose=2,
+        filepath=get_filename_for_saving(start_time),
+        verbose=VERBOSE_LEVEL,
         save_best_only=True)
     model.fit_generator(
         generator_fn(featurized=featurized),
