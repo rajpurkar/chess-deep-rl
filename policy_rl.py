@@ -108,15 +108,16 @@ def play(white_engine, black_engine):
     black_scores = [score for game in black_scores for score in game]
 
     # Shuffle lists
-    idx = list(np.random.permutation(len(white_states)))
-    white_states = np.array([white_states[i] for i in idx])
-    black_states = np.array([black_states[i] for i in idx])
-    white_actions_from = np.array([white_actions_from[i] for i in idx])
-    white_actions_to = np.array([white_actions_to[i] for i in idx])
-    black_actions_from = np.array([black_actions_from[i] for i in idx])
-    black_actions_to = np.array([black_actions_to[i] for i in idx])
-    white_scores = np.array([white_scores[i] for i in idx])
-    black_scores = np.array([black_scores[i] for i in idx])
+    white_idx = list(np.random.permutation(len(white_states)))
+    white_states = np.array([white_states[i] for i in white_idx])
+    white_actions_from = np.array([white_actions_from[i] for i in white_idx])
+    white_actions_to = np.array([white_actions_to[i] for i in white_idx])
+    white_scores = np.array([white_scores[i] for i in white_idx])
+    black_idx = list(np.random.permutation(len(black_states)))
+    black_states = np.array([black_states[i] for i in black_idx])
+    black_actions_from = np.array([black_actions_from[i] for i in black_idx])
+    black_actions_to = np.array([black_actions_to[i] for i in black_idx])
+    black_scores = np.array([black_scores[i] for i in black_idx])
 
     return (white_states, [white_actions_from, white_actions_to], white_scores), (black_states, [black_actions_from, black_actions_to], black_scores)
 
@@ -141,6 +142,7 @@ if __name__ == "__main__":
     print("Begin play")
     while True:
         white_sar, black_sar = play(white_engine, black_engine)
+        print(white_sar[2])
         break
         train(white_engine, white_sar[0], white_sar[1], white_sar[2])
         train(black_engine, black_sar[0], black_sar[1], black_sar[2])
