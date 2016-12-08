@@ -1,10 +1,15 @@
 from engines.PolicyEngine import PolicyEngine
 import chess
 import data
+import numpy as np
+import time
 
-white_model_hdf5 = ""
-black_model_hdf5 = ""
-NUM_GAMES_PER_BATCH = 100
+white_model_hdf5 = "saved/policy/white-12.8.10.45-4.74.hdf5"
+black_model_hdf5 = "saved/policy/black-12.8.10.45-4.59.hdf5"
+NUM_GAMES_PER_BATCH = 128
+
+NUMBER_EPOCHS = 1  # some large number
+VERBOSE_LEVEL = 1
 
 def get_result(board):
     result = board.result()
@@ -55,10 +60,14 @@ def play(white_engine, black_engine):
         # Play white
         X, [y_from, y_to], moves = white_engine.search(boards)
         for i, (idx, board) in enumerate(boards.items()):
+            if not board.is_legal(moves[i]):
+                print(moves[i])
+                print(board)
+                return
             board.push(moves[i])
-            white_states[idx].append(X[i,:].reshape(1, X.shape[1]))
-            white_actions_from[idx].append(y_from[i,:].reshape(1, y_from.shape[1]))
-            white_actions_to[idx].append(y_to[i,:].reshape(1, y_to.shape[1]))
+            white_states[idx].append(np.expand_dims(X[i,:], axis=0))
+            white_actions_from[idx].append(np.expand_dims(y_from[i,:], axis=0))
+            white_actions_to[idx].append(np.expand_dims(y_to[i,:], axis=0))
             num_white_moves[idx] += 1
 
         # Filter out finished games
@@ -77,12 +86,17 @@ def play(white_engine, black_engine):
         # Play black
         X, [y_from, y_to], moves = black_engine.search(boards)
         for i, (idx, board) in enumerate(boards.items()):
+            if not board.is_legal(moves[i]):
+                print(moves[i])
+                print(board)
+                return
             board.push(moves[i])
-            black_states[idx].append(X[i,:].reshape(1, X.shape[1]))
-            black_actions_from[idx].append(y_from[i,:].reshape(1, y_from.shape[1]))
-            black_actions_to[idx].append(y_to[i,:].reshape(1, y_to.shape[1]))
+            black_states[idx].append(np.expand_dims(X[i,:], axis=0))
+            black_actions_from[idx].append(np.expand_dims(y_from[i,:], axis=0))
+            black_actions_to[idx].append(np.expand_dims(y_to[i,:], axis=0))
             num_black_moves[idx] += 1
 
+        print(board)
     # Flatten lists
     white_states = [a for game in white_states for a in game]
     black_states = [a for game in black_states for a in game]
@@ -94,7 +108,7 @@ def play(white_engine, black_engine):
     black_scores = [score for game in black_scores for score in game]
 
     # Shuffle lists
-    idx = list(np.random.permutation(len(actions)))
+    idx = list(np.random.permutation(len(white_states)))
     white_states = np.array([white_states[i] for i in idx])
     black_states = np.array([black_states[i] for i in idx])
     white_actions_from = np.array([white_actions_from[i] for i in idx])
@@ -106,15 +120,27 @@ def play(white_engine, black_engine):
 
     return (white_states, [white_actions_from, white_actions_to], white_scores), (black_states, [black_actions_from, black_actions_to], black_scores)
 
+def get_filename_for_saving(net_type, start_time):
+    folder_name = FOLDER_TO_SAVE + net_type + '/' + start_time
+    if not os.path.exists(folder_name):
+        os.makedirs(folder_name)
+    return folder_name + "/{epoch:02d}-{val_loss:.2f}.hdf5"
+
 def train(engine, X, y, r):
-    # TODO
-    engine.model.fit(X, y)
+    from keras.callbacks import ModelCheckpoint
+
+    start_time = str(int(time.time()))
+    checkpointer = ModelCheckpoint(filepath=get_filename_for_saving('policy_rl', start_time), verbose=2, save_best_only=True)
+    model.fit(X, y, sample_weight=r, batch_size=BATCH_SIZE, nb_epoch=NUMBER_EPOCHS, callbacks=[checkpointer], verbose=VERBOSE_LEVEL)
 
 if __name__ == "__main__":
+    print("Initializing engines")
     white_engine = PolicyEngine(white_model_hdf5)
     black_engine = PolicyEngine(black_model_hdf5)
 
+    print("Begin play")
     while True:
         white_sar, black_sar = play(white_engine, black_engine)
+        break
         train(white_engine, white_sar[0], white_sar[1], white_sar[2])
         train(black_engine, black_sar[0], black_sar[1], black_sar[2])

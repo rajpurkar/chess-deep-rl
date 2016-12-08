@@ -155,10 +155,11 @@ def action_from_move(move):
         a_to[move.to_square] = 1
         return (a_from, a_to)
 
-def move_from_action(a_from, a_to):
-    (from_square,) = np.where(a_from==1)
-    (to_square,) = np.where(a_to==1)
-    return chess.Move(from_square[0], to_square[0])
+def move_from_action(from_square, to_square):
+    return chess.Move(from_square, to_square)
+    # (from_square,) = np.where(a_from==1)
+    # (to_square,) = np.where(a_to==1)
+    # return chess.Move(from_square[0], to_square[0])
 
 class Dataset:
     def __init__(self, filename, loop=False):
