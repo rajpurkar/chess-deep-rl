@@ -7,20 +7,26 @@ np.random.seed(20)
 
 FOLDER_TO_SAVE = "./saved/"
 NUMBER_EPOCHS = 10000  # some large number
-SAMPLES_PER_EPOCH = 40064  # tune for feedback/speed balance
+SAMPLES_PER_EPOCH = 10016  # tune for feedback/speed balance
 VERBOSE_LEVEL = 1
 
 
-def common_network(**kwargs):
+def build_network(**kwargs):
+    from keras.models import Model
     from keras.layers.convolutional import Convolution2D
-    from keras.layers import Input, Flatten, Dropout
     from keras.layers.normalization import BatchNormalization
     from keras.layers.advanced_activations import PReLU
+    from keras.layers import Dense, Dropout, Activation, \
+        Reshape, Flatten, Input, merge
+
     defaults = {
         "board_side_length": 8,
-        "layers": 4,
-        "num_filters": 6,
-        "dropout": 0
+        "conv_layers": 2,
+        "num_filters": 20,
+        "dropout": 0,
+        "dense_layers": 2,
+        "dense_hidden": 20,
+        "output_size": 64
     }
     params = defaults
     params.update(kwargs)
@@ -30,58 +36,67 @@ def common_network(**kwargs):
         params["board_side_length"],
         params["board_side_length"]))
 
-    conv_mess = conv_input
-    for i in range(0, params["layers"]):
+    def conv_wrap(conv_out):
         # use filter_width_K if it is there, otherwise use 3
         filter_key = "filter_width_%d" % i
         filter_width = params.get(filter_key, 3)
         num_filters = params["num_filters"]
-        conv_mess = Convolution2D(
+        conv_out = Convolution2D(
             nb_filter=num_filters,
             nb_row=filter_width,
             nb_col=filter_width,
             init='he_normal',
-            border_mode='same')(conv_mess)
-        conv_mess = BatchNormalization()(conv_mess)
-        conv_mess = PReLU()(conv_mess)
+            border_mode='same')(conv_out)
+        conv_out = BatchNormalization()(conv_out)
+        conv_out = PReLU()(conv_out)
         if params["dropout"] > 0:
-            conv_mess = Dropout(params["dropout"])(conv_mess)
-    flattened = Flatten()(conv_mess)
-    return conv_input, flattened
+            conv_out = Dropout(params["dropout"])(conv_out)
+        return conv_out
 
+    def dense_wrap(dense_out):
+        dense_out = Dense(params["dense_hidden"],
+                          init="he_normal")(dense_out)
+        dense_out = BatchNormalization()(dense_out)
+        dense_out = PReLU()(dense_out)
+        if params["dropout"] > 0:
+            dense_out = Dropout(params["dropout"])(dense_out)
+        return dense_out
 
-def policy_network(**kwargs):
-    from keras.models import Model
-    from keras.layers import Dense, Dropout, merge
-    from keras.layers.normalization import BatchNormalization
-    from keras.layers.advanced_activations import PReLU
+    conv_out = conv_input
+    for i in range(0, params["conv_layers"]):
+        conv_out = conv_wrap(conv_out)
 
-    params = {
-        "dense_layers": 1,
-        "dense_hidden": 64,
-        "output_size": 64,
-        "dropout": 0
-    }
-    params.update(kwargs)
-
-    conv_input, flattened = common_network(**kwargs)
-    dense_mess = flattened
+    flattened = Flatten()(conv_out)
+    dense_out = flattened
     for i in range(params["dense_layers"]):
-        dense_mess = Dense(params["dense_hidden"], init="he_normal")(dense_mess)
-        dense_mess = BatchNormalization()(dense_mess)
-        dense_mess = PReLU()(dense_mess)
-        if params["dropout"] > 0:
-            dense_mess = Dropout(params["dropout"])(dense_mess)
+        dense_out = dense_wrap(dense_out)
 
     # output for the first board
-    output_from = Dense(params["output_size"], activation="softmax")(dense_mess)
-    merged_output_from = merge([output_from, dense_mess], mode='concat')
+    output_pre_activation = Dense(
+        params["output_size"],
+        init="he_uniform")(dense_out)
+    output_from = Activation('softmax')(output_pre_activation)
 
     # output for the second board
-    output_to = Dense(params["output_size"], activation="softmax")(merged_output_from)
+    output_reshaped = Reshape((1, 8, 8))(output_pre_activation)
+    conv_merged = merge(
+        [output_reshaped, conv_out],
+        mode='concat',
+        concat_axis=1)
+
+    conv_out_2 = conv_merged
+    for i in range(0, params["conv_layers"]):
+        conv_out_2 = conv_wrap(conv_out_2)
+    flattened2 = Flatten()(conv_out_2)
+    dense_out = flattened2
+    for i in range(params["dense_layers"]):
+        dense_out = dense_wrap(dense_out)
+    output_to = Dense(params["output_size"],
+                      init="he_uniform",
+                      activation="softmax")(dense_out)
 
     model = Model(conv_input, [output_from, output_to])
-    model.compile('adam', 'categorical_crossentropy', metrics=['accuracy'])
+    model.compile('adamax', 'categorical_crossentropy', metrics=['accuracy'])
     return model
 
 
@@ -98,8 +113,11 @@ def train(net_type):
     generator_fn = d.white_state_action_sl
     d_test = Dataset('data/small_test.pgn')
     featurized = True
-    X_val, y_from_val, y_to_val = d_test.load('white_state_action_sl', featurized=featurized, refresh=False)
-    model = policy_network(board_num_channels=X_val[0].shape[0])
+    X_val, y_from_val, y_to_val = d_test.load(
+        'white_state_action_sl',
+        featurized=featurized,
+        refresh=False)
+    model = build_network(board_num_channels=X_val[0].shape[0])
     from keras.callbacks import ModelCheckpoint
     checkpointer = ModelCheckpoint(
         filepath=get_filename_for_saving('policy', start_time),
