@@ -21,11 +21,11 @@ def build_network(**kwargs):
 
     defaults = {
         "board_side_length": 8,
-        "conv_layers": 2,
-        "num_filters": 20,
+        "conv_layers": 4,
+        "num_filters": 32,
         "dropout": 0,
         "dense_layers": 2,
-        "dense_hidden": 20,
+        "dense_hidden": 64,
         "output_size": 64
     }
     params = defaults
@@ -73,14 +73,13 @@ def build_network(**kwargs):
 
     # output for the first board
     output_pre_activation = Dense(
-        params["output_size"],
-        init="he_uniform")(dense_out)
+        params["output_size"])(dense_out)
     output_from = Activation('softmax')(output_pre_activation)
 
     # output for the second board
-    output_reshaped = Reshape((1, 8, 8))(output_pre_activation)
+    output_reshaped = Reshape((1, 8, 8))(output_from)
     conv_merged = merge(
-        [output_reshaped, conv_out],
+        [output_reshaped, conv_input],
         mode='concat',
         concat_axis=1)
 
@@ -91,9 +90,7 @@ def build_network(**kwargs):
     dense_out = flattened2
     for i in range(params["dense_layers"]):
         dense_out = dense_wrap(dense_out)
-    output_to = Dense(params["output_size"],
-                      init="he_uniform",
-                      activation="softmax")(dense_out)
+    output_to = Dense(params["output_size"], activation="softmax")(dense_out)
 
     model = Model(conv_input, [output_from, output_to])
     model.compile('adamax', 'categorical_crossentropy', metrics=['accuracy'])
