@@ -119,6 +119,31 @@ def plot_model(model, start_time):
         show_shapes=True,
         show_layer_names=False)
 
+def extract_move(Callback):
+    def __init__(self, **kwargs):
+        super().__init__(kwargs)
+        self.model = kwargs["model"]
+        self.X = kwargs["X"]
+        self.y_from_val, self.y_to_val = kwargs["y"]
+        self.num_top = 5
+
+    def on_epoch_end(self, batch, log={}):
+        y_from, y_to = self.model.predict(self.X, verbose=0)
+
+        score = np.zeros((X.shape[0],))
+        for i in range(X.shape[0]):
+            p = np.outer(y_from, y_to)
+            p_shape = p.shape
+            p = p.reshape((-1,))
+
+            for j, idx in enumerate(np.argsort(p)):
+                if j >= self.num_top:
+                    break
+                from_square, to_square = np.unravel_index(idx, p_shape)
+                if from_square == self.y_from_val[i] and to_square == self.y_to_val[i]:
+                    score[i] = 1
+                    break
+        print("Joint move accuracy: %f" % score.sum() / score.shape[0])
 
 def train(net_type):
     d = Dataset('data/large-ccrl.pgn')
