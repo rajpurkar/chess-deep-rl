@@ -77,7 +77,7 @@ def featurized_state_from_board(board):
 
     WHITE, BLACK, OTHER_WHITE, OTHER_BLACK = (0, 1, 2, 3)
     def apply_mask(mask):
-        non_mask = pieces & (~mask)
+        non_mask = pieces # & (~mask)
         white_mask = bitmap_to_array(mask & board.occupied_co[chess.WHITE])
         black_mask = bitmap_to_array(mask & board.occupied_co[chess.BLACK])
         white_non_mask = bitmap_to_array(non_mask & board.occupied_co[chess.WHITE])
@@ -93,16 +93,16 @@ def featurized_state_from_board(board):
     # Rooks
     rooks = apply_mask(board.rooks)
     phi_rooks = (np.zeros((NUM_ROWS, NUM_COLS)), np.zeros((NUM_ROWS, NUM_COLS)), np.zeros((NUM_ROWS, NUM_COLS)), np.zeros((NUM_ROWS, NUM_COLS)))
-    idx_rook = ([(row,0) for row in range(NUM_ROWS)], \
-                [(0,col) for col in range(NUM_COLS)], \
+    idx_rook = ([(row,0) for row in range(1,NUM_ROWS)], \
+                [(0,col) for col in range(1,NUM_COLS)], \
                 [(-row,0) for row in range(1,NUM_ROWS)], \
                 [(0,-col) for col in range(1,NUM_COLS)])
 
     # Bishops
     bishops = apply_mask(board.bishops)
     phi_bishops = (np.zeros((NUM_ROWS, NUM_COLS)), np.zeros((NUM_ROWS, NUM_COLS)), np.zeros((NUM_ROWS, NUM_COLS)), np.zeros((NUM_ROWS, NUM_COLS)))
-    idx_bishop = ([(row,row) for row in range(NUM_ROWS)], \
-                  [(-row,row) for row in range(NUM_ROWS)], \
+    idx_bishop = ([(row,row) for row in range(1,NUM_ROWS)], \
+                  [(-row,row) for row in range(1,NUM_ROWS)], \
                   [(-row,-row) for row in range(1,NUM_ROWS)], \
                   [(row,-row) for row in range(1,NUM_ROWS)])
 
