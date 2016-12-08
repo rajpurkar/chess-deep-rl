@@ -8,7 +8,7 @@ np.random.seed(20)
 FOLDER_TO_SAVE = "./saved/"
 NUMBER_EPOCHS = 10000  # some large number
 SAMPLES_PER_EPOCH = 10016  # tune for feedback/speed balance
-VERBOSE_LEVEL = 2
+VERBOSE_LEVEL = 1
 
 
 def build_network(**kwargs):
@@ -72,7 +72,7 @@ def build_network(**kwargs):
     dense_out = flattened
     for i in range(params["dense_layers"]):
         dense_out = dense_wrap(dense_out)
-    output_from = Dense(params["output_size"], activation="softmax")(dense_out)
+    output_from = Dense(params["output_size"], activation="softmax", name='from_board')(dense_out)
 
     if params["conditioned_architecture"] is True:
         output_reshaped = Reshape((1, 8, 8))(output_from)
@@ -91,7 +91,7 @@ def build_network(**kwargs):
 
     for i in range(params["dense_layers"]):
         dense_out_2 = dense_wrap(dense_out_2)
-    output_to = Dense(params["output_size"], activation="softmax")(dense_out_2)
+    output_to = Dense(params["output_size"], activation="softmax", name="to_board")(dense_out_2)
 
     model = Model(conv_input, [output_from, output_to])
 
