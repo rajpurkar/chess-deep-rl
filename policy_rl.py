@@ -1,8 +1,9 @@
 from engines.PolicyEngine import PolicyEngine
 import chess
 import numpy as np
+import os
 
-NUM_GAMES_PER_BATCH = 12
+NUM_GAMES_PER_BATCH = 128
 NUMBER_EPOCHS = 1  # some large number
 VERBOSE_LEVEL = 1
 
@@ -121,7 +122,9 @@ def play(white_engine, black_engine):
             black_actions_to[idx].append(np.expand_dims(y_to[i, :], axis=0))
             num_black_moves[idx] += 1
 
-        #print(board)
+        os.system("clear")
+        print(board)
+        print(scores)
     # Flatten lists
     white_states = [a for game in white_states for a in game]
     black_states = [a for game in black_states for a in game]
@@ -144,15 +147,7 @@ def play(white_engine, black_engine):
     black_actions_to = np.array([black_actions_to[i] for i in black_idx])
     black_scores = np.array([black_scores[i] for i in black_idx])
 
-    return
-    (
-        white_states,
-        [white_actions_from, white_actions_to],
-        white_scores),
-    (
-        black_states,
-        [black_actions_from, black_actions_to],
-        black_scores), scores
+    return (white_states, [white_actions_from, white_actions_to], white_scores), (black_states, [black_actions_from, black_actions_to], black_scores), scores
 
 
 """
@@ -184,7 +179,6 @@ if __name__ == "__main__":
     print("Begin play")
     while True:
         white_sar, black_sar, scores = play(white_engine, black_engine)
-        print(scores)
         break
         # train(white_engine, white_sar[0], white_sar[1], white_sar[2])
         # train(black_engine, black_sar[0], black_sar[1], black_sar[2])

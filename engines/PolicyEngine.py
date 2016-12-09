@@ -12,7 +12,7 @@ class PolicyEngine(ChessEngine):
         super().__init__()
         if model_hdf5 is not None:
             self.model = load_model(model_hdf5)
-            self.epsilon = epsilon
+            # self.epsilon = epsilon
 
     def search(self, boards=None):
         if boards is not None:
@@ -34,6 +34,7 @@ class PolicyEngine(ChessEngine):
             y_to = []
             for i in range(y_hat_from.shape[0]):
                 board = boards_list[i]
+                """
                 if random.random() < self.epsilon:
                     move = random.choice(list(board.generate_legal_moves()))
                     a_from, a_to = data.action_from_move(move)
@@ -43,32 +44,29 @@ class PolicyEngine(ChessEngine):
                     continue
 
                     # TODO random item from list
-
+                """
                 # Multiply probabilities
-                p = np.outer(y_hat_from[i,:], y_hat_to[i,:])
+                p = np.outer(y_hat_from[i], y_hat_to[i])
                 p_shape = p.shape
                 p = p.reshape((-1,))
 
                 # Find max probability action
-                appended = False
-                for idx in reversed(np.argsort(p).tolist()):
+                # for idx in reversed(np.argsort(p).tolist()):
+                NUM_TRIES = 10
+                move = None
+                for _ in range(NUM_TRIES):
+                    idx = np.random.choice(p.shape[0], p=p.flatten())
                     from_square, to_square = np.unravel_index(idx, p_shape)
-                    move = data.move_from_action(from_square, to_square)
-                    if board.is_legal(move):
-                        appended = True
-                        moves.append(move)
-                        a_from, a_to = data.action_from_move(move)
-                        y_from.append(a_from)
-                        y_to.append(a_to)
+                    move_attempt = data.move_from_action(from_square, to_square)
+                    if board.is_legal(move_attempt):
+                        move = move_attempt
                         break
-
-                if not appended:
+                if move is None:
                     move = random.choice(list(board.generate_legal_moves()))
-                    a_from, a_to = data.action_from_move(move)
-                    moves.append(move)
-                    y_from.append(a_from)
-                    y_to.append(a_to)
-
+                moves.append(move)
+                a_from, a_to = data.action_from_move(move)
+                y_from.append(a_from)
+                y_to.append(a_to)
             y_from = np.array(y_from)
             y_to = np.array(y_to)
             return X, [y_from, y_to], moves
