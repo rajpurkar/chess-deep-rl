@@ -4,9 +4,12 @@ import numpy as np
 import os
 
 FOLDER_TO_SAVE = "./saved/"
-NUM_GAMES_PER_BATCH = 1#128
-NUMBER_EPOCHS = 10  # some large number
+
+NUMBER_EPOCHS = 10000  # some large number
+SAMPLES_PER_EPOCH = 10016  # tune for feedback/speed balance
 VERBOSE_LEVEL = 1
+
+NUM_PARALLELL_GAMES = 128
 MAX_TURNS_PER_GAME = 100
 
 def custom_result(board):
@@ -65,39 +68,159 @@ class SelfPlayController:
         self.boards = boards_next
         return len(self.boards)
 
-    def play_engine_move(self, engine, states, actions_from, actions_to, num_moves):
+    def play_engine_move(self, engine, states, actions_from, actions_to):
         X, [y_from, y_to], moves = engine.search(self.boards)
-        for i, (idx, board) in enumerate(self.boards.items()):
+        for i, board in enumerate(self.boards):
             if not board.is_legal(moves[i]):
                 print(moves[i])
                 print(board)
-                raise("Move not legal")
+                raise Exception("Move not legal")
+
             board.push(moves[i])
-            states[idx].append(np.expand_dims(X[i, :], axis=0))
-            actions_from[idx].append(np.expand_dims(y_from[i, :], axis=0))
-            actions_to[idx].append(np.expand_dims(y_to[i, :], axis=0))
-            num_moves[idx] += 1
+            states[i].append(X[i])
+            actions_from[i].append(y_from[i])
+            actions_to[i].append(y_to[i])
+
+    def collect_game_results(self):
+        # Check game results
+        for i, board in enumerate(self.boards):
+            result = get_result(board)
+            if result is not None or len(self.white_states[i]) > MAX_TURNS_PER_GAME:
+                # Add game to finished pool
+                if result >= 1:
+                    self.finished_win_states        += self.white_states[i]
+                    self.finished_win_actions_from  += self.white_actions_from[i]
+                    self.finished_win_actions_to    += self.white_actions_to[i]
+                    self.finished_lose_states       += self.black_states[i]
+                    self.finished_lose_actions_from += self.black_actions_from[i]
+                    self.finished_lose_actions_to   += self.black_actions_to[i]
+                elif result <= -1:
+                    self.finished_win_states        += self.black_states[i]
+                    self.finished_win_actions_from  += self.black_actions_from[i]
+                    self.finished_win_actions_to    += self.black_actions_to[i]
+                    self.finished_lose_states       += self.white_states[i]
+                    self.finished_lose_actions_from += self.white_actions_from[i]
+                    self.finished_lose_actions_to   += self.white_actions_to[i]
+
+                # Reset board
+                self.boards[i] = chess.Board()
+                self.white_states[i]       = []
+                self.white_actions_from[i] = []
+                self.white_actions_to[i]   = []
+                self.black_states[i]       = []
+                self.black_actions_from[i] = []
+                self.black_actions_to[i]   = []
+
+                # Play a single white move if it's black's turn for the other boards
+                if self.black_turn:
+                    X, [y_from, y_to], moves = self.white_engine.search([self.boards[i]])
+                    self.white_states[i].append(X[0])
+                    self.white_actions_from[i].append(y_from[0])
+                    self.white_actions_to[i].append(y_to[0])
+
+                # Update scoreboard
+                if result >= 1:
+                    self.scoreboard[0] += 1
+                elif result <= -1:
+                    self.scoreboard[1] += 1
+                elif result == 0:
+                    self.scoreboard[2] += 1
+                else:
+                    self.scoreboard[3] += 1
+
+    def play_generator(self):
+        self.boards = [chess.Board() for i in range(NUM_PARALLELL_GAMES)]
+
+        self.white_states       = [[] for _ in range(NUM_PARALLELL_GAMES)]
+        self.white_actions_from = [[] for _ in range(NUM_PARALLELL_GAMES)]
+        self.white_actions_to   = [[] for _ in range(NUM_PARALLELL_GAMES)]
+        self.black_states       = [[] for _ in range(NUM_PARALLELL_GAMES)]
+        self.black_actions_from = [[] for _ in range(NUM_PARALLELL_GAMES)]
+        self.black_actions_to   = [[] for _ in range(NUM_PARALLELL_GAMES)]
+
+        self.finished_win_states        = []
+        self.finished_win_actions_from  = []
+        self.finished_win_actions_to    = []
+        self.finished_lose_states       = []
+        self.finished_lose_actions_from = []
+        self.finished_lose_actions_to   = []
+
+        # [white, black, draw]
+        self.scoreboard = [0, 0, 0, 0]
+
+        self.black_turn = False
+
+        while True:
+            # Play white move in all games
+            self.play_engine_move(self.white_engine, self.white_states, self.white_actions_from, self.white_actions_to)
+            self.black_turn = not self.black_turn
+            self.collect_game_results()
+
+            # Play black move in all games
+            self.play_engine_move(self.black_engine, self.black_states, self.black_actions_from, self.black_actions_to)
+            self.black_turn = not self.black_turn
+            self.collect_game_results()
+
+            os.system("clear")
+            print(self.boards[i])
+            print("White: %d   Black: %d   Draw: %d   Endless: %d" % (scores[0], scores[1], scores[2], scores[3]))
+
+            # Yield won games
+            while len(finished_win_states) > BATCH_SIZE:
+                idx_random = list(np.random.permutation(len(finished_win_states)))
+                win_states_shuffle       = [self.finished_win_states[idx] for idx in idx_random]
+                win_actions_from_shuffle = [self.finished_win_actions_from[idx] for idx in idx_random]
+                win_actions_to_shuffle   = [self.finished_win_actions_to[idx] for idx in idx_random]
+                X_win      = np.array(win_states_shuffle[:BATCH_SIZE])
+                y_from_win = np.array(win_actions_from_shuffle[:BATCH_SIZE])
+                y_to_win   = np.array(win_actions_to_shuffle[:BATCH_SIZE])
+                self.finished_win_states       = win_states_shuffle[BATCH_SIZE:]
+                self.finished_win_actions_from = win_actions_from_shuffle[BATCH_SIZE:]
+                self.finished_win_actions_to   = win_actions_to_shuffle[BATCH_SIZE:]
+
+                learning_rate = abs(engine.model.optimizer.lr.get_value())
+                engine.model.optimizer.lr.set_value(learning_rate)
+
+                yield X_win, [y_from_win, y_to_win]
+
+            # Yield lost games
+            while len(finished_lose_states) > BATCH_SIZE:
+                idx_random = list(np.random.permutation(len(finished_win_states)))
+                lose_states_shuffle       = [self.finished_lose_states[idx] for idx in idx_random]
+                lose_actions_from_shuffle = [self.finished_lose_actions_from[idx] for idx in idx_random]
+                lose_actions_to_shuffle   = [self.finished_lose_actions_to[idx] for idx in idx_random]
+                X_lose      = np.array(lose_states_shuffle[:BATCH_SIZE])
+                y_from_lose = np.array(lose_actions_from_shuffle[:BATCH_SIZE])
+                y_to_lose   = np.array(lose_actions_to_shuffle[:BATCH_SIZE])
+                self.finished_lose_states       = lose_states_shuffle[BATCH_SIZE:]
+                self.finished_lose_actions_from = lose_actions_from_shuffle[BATCH_SIZE:]
+                self.finished_lose_actions_to   = lose_actions_to_shuffle[BATCH_SIZE:]
+
+                learning_rate = abs(engine.model.optimizer.lr.get_value())
+                engine.model.optimizer.lr.set_value(-learning_rate)
+
+                yield X_lose, [y_from_lose, y_to_lose]
 
     def play(self):
         """
-        Play NUM_GAMES_PER_BATCH games and return X, y
+        Play NUM_PARALLELL_GAMES games and return X, y
         - X: np.array [n states (total from all games) x state dim]
         - y: np.array [n actions (total from all games) x action dim]
         - r: np.array [n results (total from all games) x 1]
         """
 
-        self.boards = {i: chess.Board() for i in range(NUM_GAMES_PER_BATCH)}
-        self.num_white_moves = [0] * NUM_GAMES_PER_BATCH
-        self.num_black_moves = [0] * NUM_GAMES_PER_BATCH
+        self.boards = {i: chess.Board() for i in range(NUM_PARALLELL_GAMES)}
+        self.num_white_moves = [0] * NUM_PARALLELL_GAMES
+        self.num_black_moves = [0] * NUM_PARALLELL_GAMES
 
-        white_states = [[] for _ in range(NUM_GAMES_PER_BATCH)]
-        white_actions_from = [[] for _ in range(NUM_GAMES_PER_BATCH)]
-        white_actions_to = [[] for _ in range(NUM_GAMES_PER_BATCH)]
-        black_states = [[] for _ in range(NUM_GAMES_PER_BATCH)]
-        black_actions_from = [[] for _ in range(NUM_GAMES_PER_BATCH)]
-        black_actions_to = [[] for _ in range(NUM_GAMES_PER_BATCH)]
-        self.white_scores = [[] for _ in range(NUM_GAMES_PER_BATCH)]
-        self.black_scores = [[] for _ in range(NUM_GAMES_PER_BATCH)]
+        white_states = [[] for _ in range(NUM_PARALLELL_GAMES)]
+        white_actions_from = [[] for _ in range(NUM_PARALLELL_GAMES)]
+        white_actions_to = [[] for _ in range(NUM_PARALLELL_GAMES)]
+        black_states = [[] for _ in range(NUM_PARALLELL_GAMES)]
+        black_actions_from = [[] for _ in range(NUM_PARALLELL_GAMES)]
+        black_actions_to = [[] for _ in range(NUM_PARALLELL_GAMES)]
+        self.white_scores = [[] for _ in range(NUM_PARALLELL_GAMES)]
+        self.black_scores = [[] for _ in range(NUM_PARALLELL_GAMES)]
 
         # [white, black, draw]
         self.scores = [0, 0, 0]
@@ -179,23 +302,19 @@ def log_loss(y_true, y_pred):
     '''
     return -y_true * K.log(K.clip(y_pred, K.epsilon(), 1.0 - K.epsilon()))
 
-def train(engine, X, y, r, engine_type):
+def train(controller):
     from keras.callbacks import ModelCheckpoint
 
     start_time = str(int(time.time()))
     #  checkpointer = ModelCheckpoint(filepath=get_filename_for_saving(engine_type + '_policy_rl', start_time), verbose=2, save_best_only=True)
     #  engine.model.fit(X, y, sample_weight=[r,r], nb_epoch=NUMBER_EPOCHS, callbacks=[checkpointer], verbose=VERBOSE_LEVEL)
-    if r[0] == 0:
-        return
 
-    learning_rate = abs(engine.model.optimizer.lr.get_value())
-    if r[0] == 1:
-        engine.model.optimizer.lr.set_value(learning_rate)
-    else:
-        engine.model.optimizer.lr.set_value(-learning_rate)
-    sample_weight = learning_rate * r
-    #  engine.model.fit(X, y, sample_weight=[sample_weight,sample_weight], nb_epoch=NUMBER_EPOCHS, verbose=VERBOSE_LEVEL)
-    engine.model.fit(X, y, nb_epoch=NUMBER_EPOCHS, verbose=VERBOSE_LEVEL)
+    engine.model.fit_generator(
+        controller.play_generator(),
+        samples_per_epoch = SAMPLES_PER_EPOCH
+        nb_epoch          = NUMBER_EPOCHS,
+        # callbacks         = [checkpointer],
+        verbose           = VERBOSE_LEVEL)
 
 
 if __name__ == "__main__":
@@ -204,11 +323,7 @@ if __name__ == "__main__":
     black_model_hdf5 = "saved/black_model.hdf5"
 
     white_engine = PolicyEngine(white_model_hdf5)
-    black_engine = PolicyEngine(black_model_hdf5)
+    black_engine = PolicyEngine(black_model_hdf5, black=True)
     controller = SelfPlayController(white_engine, black_engine)
 
-    print("Begin play")
-    while True:
-        white_sar, black_sar = controller.play()
-        train(white_engine, white_sar[0], white_sar[1], white_sar[2], "white")
-        train(black_engine, black_sar[0], black_sar[1], black_sar[2], "black")
+    train(controller)

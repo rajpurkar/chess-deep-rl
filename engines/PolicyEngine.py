@@ -9,11 +9,11 @@ import random
 NUM_TRIES = 10
 
 class PolicyEngine(ChessEngine):
-    def __init__(self, model_hdf5=None, epsilon=0.1):
+    def __init__(self, model_hdf5=None, black=False):
         super().__init__()
         if model_hdf5 is not None:
             self.model = load_model(model_hdf5)
-            # self.epsilon = epsilon
+            self.is_black = black
 
     def search(self, boards=None):
         if boards is None:
@@ -36,15 +36,6 @@ class PolicyEngine(ChessEngine):
         y_to = []
         for i in range(y_hat_from.shape[0]):
             board = boards_list[i]
-            """
-            if random.random() < self.epsilon:
-                move = random.choice(list(board.generate_legal_moves()))
-                a_from, a_to = data.action_from_move(move)
-                moves.append(move)
-                y_from.append(a_from)
-                y_to.append(a_to)
-                continue
-            """
             # Multiply probabilities
             p = np.outer(y_hat_from[i], y_hat_to[i])
             p_shape = p.shape
@@ -59,14 +50,14 @@ class PolicyEngine(ChessEngine):
             idx_random = np.random.choice(p.shape[0], min(NUM_TRIES, np.count_nonzero(p), num_non_nan), replace=False, p=p)
             for idx in idx_random:
                 from_square, to_square = np.unravel_index(idx, p_shape)
-                move_attempt = data.move_from_action(from_square, to_square)
+                move_attempt = data.move_from_action(from_square, to_square, black=self.is_black)
                 if board.is_legal(move_attempt):
                     move = move_attempt
                     break
             if move is None:
                 move = random.choice(list(board.generate_legal_moves()))
             moves.append(move)
-            a_from, a_to = data.action_from_move(move)
+            a_from, a_to = data.action_from_move(move, black=self.is_black)
             y_from.append(a_from)
             y_to.append(a_to)
         
