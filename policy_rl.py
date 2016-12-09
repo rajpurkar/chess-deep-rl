@@ -1,30 +1,25 @@
 from engines.PolicyEngine import PolicyEngine
 import chess
-import data
 import numpy as np
-import time
 
-white_model_hdf5 = "saved/white_model.hdf5"
-black_model_hdf5 = "saved/black_model.hdf5"
 NUM_GAMES_PER_BATCH = 12
-
 NUMBER_EPOCHS = 1  # some large number
 VERBOSE_LEVEL = 1
+
 
 def custom_result(board):
     if board.is_checkmate():
         if board.turn == chess.WHITE:
-            print("YESSSSSSS")
             return "0-1"
         else:
-            print("YESSSSSSS")
             return "1-0"
 
-    if board.is_insufficient_material() or not any(board.generate_legal_moves()):
-        print("NOOOOOOOO!!!")
+    if (board.is_insufficient_material() or
+            not any(board.generate_legal_moves())):
         return "1/2-1/2"
 
     return "*"
+
 
 def get_result(board):
     result = custom_result(board)
@@ -37,6 +32,7 @@ def get_result(board):
         elif white_score is "1":
             return 1
     return None
+
 
 def play(white_engine, black_engine):
     """
@@ -88,9 +84,9 @@ def play(white_engine, black_engine):
                 print(board)
                 return
             board.push(moves[i])
-            white_states[idx].append(np.expand_dims(X[i,:], axis=0))
-            white_actions_from[idx].append(np.expand_dims(y_from[i,:], axis=0))
-            white_actions_to[idx].append(np.expand_dims(y_to[i,:], axis=0))
+            white_states[idx].append(np.expand_dims(X[i, :], axis=0))
+            white_actions_from[idx].append(np.expand_dims(y_from[i, :], axis=0))
+            white_actions_to[idx].append(np.expand_dims(y_to[i, :], axis=0))
             num_white_moves[idx] += 1
 
         # Filter out finished games
@@ -120,9 +116,9 @@ def play(white_engine, black_engine):
                 print(board)
                 return
             board.push(moves[i])
-            black_states[idx].append(np.expand_dims(X[i,:], axis=0))
-            black_actions_from[idx].append(np.expand_dims(y_from[i,:], axis=0))
-            black_actions_to[idx].append(np.expand_dims(y_to[i,:], axis=0))
+            black_states[idx].append(np.expand_dims(X[i, :], axis=0))
+            black_actions_from[idx].append(np.expand_dims(y_from[i, :], axis=0))
+            black_actions_to[idx].append(np.expand_dims(y_to[i, :], axis=0))
             num_black_moves[idx] += 1
 
         #print(board)
@@ -148,23 +144,40 @@ def play(white_engine, black_engine):
     black_actions_to = np.array([black_actions_to[i] for i in black_idx])
     black_scores = np.array([black_scores[i] for i in black_idx])
 
-    return (white_states, [white_actions_from, white_actions_to], white_scores), (black_states, [black_actions_from, black_actions_to], black_scores), scores
+    return
+    (
+        white_states,
+        [white_actions_from, white_actions_to],
+        white_scores),
+    (
+        black_states,
+        [black_actions_from, black_actions_to],
+        black_scores), scores
 
+
+"""
 def get_filename_for_saving(net_type, start_time):
     folder_name = FOLDER_TO_SAVE + net_type + '/' + start_time
     if not os.path.exists(folder_name):
         os.makedirs(folder_name)
     return folder_name + "/{epoch:02d}-{val_loss:.2f}.hdf5"
 
+import time
+import os
+
 def train(engine, X, y, r):
     from keras.callbacks import ModelCheckpoint
 
     start_time = str(int(time.time()))
     checkpointer = ModelCheckpoint(filepath=get_filename_for_saving('policy_rl', start_time), verbose=2, save_best_only=True)
-    model.fit(X, y, sample_weight=r, batch_size=BATCH_SIZE, nb_epoch=NUMBER_EPOCHS, callbacks=[checkpointer], verbose=VERBOSE_LEVEL)
+    engine.model.fit(X, y, sample_weight=r, batch_size=BATCH_SIZE, nb_epoch=NUMBER_EPOCHS, callbacks=[checkpointer], verbose=VERBOSE_LEVEL)
+"""
 
 if __name__ == "__main__":
     print("Initializing engines")
+    white_model_hdf5 = "saved/white_model.hdf5"
+    black_model_hdf5 = "saved/black_model.hdf5"
+
     white_engine = PolicyEngine(white_model_hdf5)
     black_engine = PolicyEngine(black_model_hdf5)
 
@@ -173,5 +186,5 @@ if __name__ == "__main__":
         white_sar, black_sar, scores = play(white_engine, black_engine)
         print(scores)
         break
-        train(white_engine, white_sar[0], white_sar[1], white_sar[2])
-        train(black_engine, black_sar[0], black_sar[1], black_sar[2])
+        # train(white_engine, white_sar[0], white_sar[1], white_sar[2])
+        # train(black_engine, black_sar[0], black_sar[1], black_sar[2])
