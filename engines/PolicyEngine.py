@@ -15,63 +15,68 @@ class PolicyEngine(ChessEngine):
             self.epsilon = epsilon
 
     def search(self, boards=None):
-        if boards is not None:
-            # Create X batch
-            states = []
-            boards_list = []
-            for board in boards.values():
-                states.append(data.state_from_board(board, featurized=True))
-                boards_list.append(board)
-            batch_size = len(states)
-            X = np.array(states)
+        if boards is None:
+            boards = {0: self.board}
 
-            # Predict batch
-            y_hat_from, y_hat_to = self.model.predict(X, batch_size=batch_size, verbose=0)
+        # Create X batch
+        states = []
+        for board in boards.values():
+            states.append(data.state_from_board(board, featurized=True))
+            boards_list.append(board)
+        batch_size = len(states)
+        X = np.array(states)
 
-            # Extract best legal move
-            moves = []
-            y_from = []
-            y_to = []
-            for i in range(y_hat_from.shape[0]):
-                board = boards_list[i]
-                if random.random() < self.epsilon:
-                    move = random.choice(list(board.generate_legal_moves()))
-                    a_from, a_to = data.action_from_move(move)
+        # Predict batch
+        y_hat_from, y_hat_to = self.model.predict(X, batch_size=batch_size, verbose=0)
+
+        # Extract best legal move
+        moves = []
+        y_from = []
+        y_to = []
+        for i in range(y_hat_from.shape[0]):
+            board = boards_list[i]
+            if random.random() < self.epsilon:
+                move = random.choice(list(board.generate_legal_moves()))
+                a_from, a_to = data.action_from_move(move)
+                moves.append(move)
+                y_from.append(a_from)
+                y_to.append(a_to)
+                continue
+
+            # Multiply probabilities
+            p = np.outer(y_hat_from[i,:], y_hat_to[i,:])
+            p_shape = p.shape
+            p = p.reshape((-1,))
+
+            # Find max probability action
+            appended = False
+            for idx in reversed(np.argsort(p).tolist()):
+                from_square, to_square = np.unravel_index(idx, p_shape)
+                move = data.move_from_action(from_square, to_square)
+                if board.is_legal(move):
+                    appended = True
                     moves.append(move)
+                    a_from, a_to = data.action_from_move(move)
                     y_from.append(a_from)
                     y_to.append(a_to)
-                    continue
+                    break
 
-                    # TODO random item from list
+            if not appended:
+                move = random.choice(list(board.generate_legal_moves()))
+                a_from, a_to = data.action_from_move(move)
+                moves.append(move)
+                y_from.append(a_from)
+                y_to.append(a_to)
 
-                # Multiply probabilities
-                p = np.outer(y_hat_from[i,:], y_hat_to[i,:])
-                p_shape = p.shape
-                p = p.reshape((-1,))
+        # Return moves for UCI
+        if moves:
+            self.moves = [moves[0]]
+        else:
+            self.moves = None
 
-                # Find max probability action
-                appended = False
-                for idx in reversed(np.argsort(p).tolist()):
-                    from_square, to_square = np.unravel_index(idx, p_shape)
-                    move = data.move_from_action(from_square, to_square)
-                    if board.is_legal(move):
-                        appended = True
-                        moves.append(move)
-                        a_from, a_to = data.action_from_move(move)
-                        y_from.append(a_from)
-                        y_to.append(a_to)
-                        break
-
-                if not appended:
-                    move = random.choice(list(board.generate_legal_moves()))
-                    a_from, a_to = data.action_from_move(move)
-                    moves.append(move)
-                    y_from.append(a_from)
-                    y_to.append(a_to)
-
-            y_from = np.array(y_from)
-            y_to = np.array(y_to)
-            return X, [y_from, y_to], moves
+        y_from = np.array(y_from)
+        y_to = np.array(y_to)
+        return X, [y_from, y_to], moves
 
 if __name__ == "__main__":
     engine = ValueBaselineEngine("./saved/1480896779-06-0.40.hdf5")
