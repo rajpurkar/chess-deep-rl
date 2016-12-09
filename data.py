@@ -15,9 +15,43 @@ NUM_ROWS = 8
 
 GAMMA = 0.99
 
-def state_from_board(board, hashable=False, featurized=False):
+def np_flip(m, axis):
+    if not hasattr(m, 'ndim'):
+        m = asarray(m)
+    indexer = [slice(None)] * m.ndim
+    try:
+        indexer[axis] = slice(None, None, -1)
+    except IndexError:
+        raise ValueError("axis=%i is invalid for the %i-dimensional input array"
+                         % (axis, m.ndim))
+    return m[tuple(indexer)]
+
+def flip_state(state):
+    num_axes = len(state.shape)
+    # state = np_flip(state, num_axes-1)
+    state = np_flip(state, num_axes-2)
+    # Swap first six rows with last six rows
+    state[[0,1,2,3,4,5,6,7,8,9,10,11]] = state[[6,7,8,9,10,11,0,1,2,3,4,5]]
+    if state.shape[0] > 12:
+        idx_start_layer = 12
+        num_quad_layers = (state.shape[0] - idx_start_layer) // 4
+        for i in range(num_quad_layers):
+            idx = 4*i + idx_start_layer
+            state[[idx+0,idx+3]] = state[[idx+3,idx+0]]
+            state[[idx+1,idx+2]] = state[[idx+2,idx+1]]
+        idx_start_layer += 4*num_quad_layers
+        num_pair_layers = (state.shape[0] - idx_start_layer) // 2
+        for i in range(num_pair_layers):
+            idx = 2*i + idx_start_layer
+            state[[idx+0,idx+1]] = state[[idx+1,idx+0]]
+    return state
+
+def state_from_board(board, hashable=False, featurized=False, black=False):
     if featurized:
-        return featurized_state_from_board(board)
+        phi = featurized_state_from_board(board)
+        if black:
+            phi = flip_state(phi)
+        return phi
 
     if not hashable:
         state = np.zeros((NUM_COLORS * NUM_PIECES, NUM_ROWS, NUM_COLS))
@@ -31,7 +65,10 @@ def state_from_board(board, hashable=False, featurized=False):
                         row = i // NUM_ROWS
                         col = i % NUM_ROWS
                         state[(1-color)*NUM_PIECES + piece_type - 1, row, col] = 1
+        if black:
+            state = flip_state(state)
     else:
+        # TODO: black state
         state = [0] * NUM_SQUARES
         for piece_type in chess.PIECE_TYPES:
             for color in chess.COLORS:
@@ -216,6 +253,12 @@ class Dataset:
         return X, Y1, Y2
 
     def white_sarsa(self):
+        return self.sarsa(black=False)
+
+    def black_sarsa(self):
+        return self.sarsa(black=True)
+
+    def sarsa(self, black=False):
         with open(self.filename) as pgn:
             game = chess.pgn.read_game(pgn)
             idx_move = 0
@@ -244,6 +287,12 @@ class Dataset:
                     board = game.board()
                     node = game.root()
                     continue
+
+                    if black:
+                        move = node.variations[0].move
+                        board.push(move)
+                        node = node.variations[0]
+                        idx_move += 1
 
                 new_game = (idx_move == 0)
 
