@@ -1,8 +1,9 @@
 from engines.PolicyEngine import PolicyEngine
 import chess
 import numpy as np
+import os
 
-NUM_GAMES_PER_BATCH = 10
+NUM_GAMES_PER_BATCH = 128
 NUMBER_EPOCHS = 1  # some large number
 VERBOSE_LEVEL = 1
 MAX_TURNS_PER_GAME = 100
@@ -130,7 +131,9 @@ def play(white_engine, black_engine):
             num_black_moves[idx] += 1
 
         i += 1
+        os.system("clear")
         print(board)
+        print(scores)
 
     # Flatten lists
     white_states = [a for game in white_states for a in game]
