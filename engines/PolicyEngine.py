@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-from engines.ChessEngine import ChessEngine
 from keras.models import load_model
 import numpy as np
 import sys
 sys.path.append('.')
+from engines.ChessEngine import ChessEngine
 import data
 import random
 
@@ -20,6 +20,7 @@ class PolicyEngine(ChessEngine):
 
         # Create X batch
         states = []
+        boards_list = []
         for board in boards.values():
             states.append(data.state_from_board(board, featurized=True))
             boards_list.append(board)
@@ -79,5 +80,5 @@ class PolicyEngine(ChessEngine):
         return X, [y_from, y_to], moves
 
 if __name__ == "__main__":
-    engine = ValueBaselineEngine("./saved/1480896779-06-0.40.hdf5")
+    engine = PolicyEngine("./saved/policy/black_model.hdf5")
     engine.run()
