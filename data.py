@@ -357,6 +357,7 @@ class Dataset:
         - action: [np.array [1 x 64 squares], np.array [1 x 64 squares]] representing [from_board, to_board]
         """
         BATCH_SIZE = 32
+        POOL_SIZE = 256
         idx_batch = 0
         with open(self.filename) as pgn:
             S = []
@@ -403,18 +404,17 @@ class Dataset:
                     A_to.append(a_to)
                     idx_batch += 1
 
-                    if idx_batch == BATCH_SIZE:
+                    if idx_batch >= BATCH_SIZE and len(S) >= POOL_SIZE:
                         # Shuffle moves in game
                         idx = list(np.random.permutation(len(S)))
-                        idx = list(range(len(S)))
                         S_shuffle = [S[i] for i in idx]
                         A_from_shuffle = [A_from[i] for i in idx]
                         A_to_shuffle = [A_to[i] for i in idx]
-                        S = []
-                        A_from = []
-                        A_to = []
+                        S = S_shuffle[BATCH_SIZE:]
+                        A_from = A_from[BATCH_SIZE:]
+                        A_to = A_to[BATCH_SIZE:]
                         idx_batch = 0
-                        yield np.array(S_shuffle), [np.array(A_from_shuffle), np.array(A_to_shuffle)]
+                        yield np.array(S_shuffle[:BATCH_SIZE]), [np.array(A_from_shuffle[:BATCH_SIZE]), np.array(A_to_shuffle[:BATCH_SIZE])]
 
     def white_phi_action_sl(self, loop=False):
         return self.white_state_action_sl(loop=loop, featurized=True)
