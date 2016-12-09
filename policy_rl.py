@@ -2,7 +2,7 @@ from engines.PolicyEngine import PolicyEngine
 import chess
 import numpy as np
 
-NUM_GAMES_PER_BATCH = 12
+NUM_GAMES_PER_BATCH = 10
 NUMBER_EPOCHS = 1  # some large number
 VERBOSE_LEVEL = 1
 MAX_TURNS_PER_GAME = 100
@@ -51,12 +51,20 @@ def play(white_engine, black_engine):
     black_states = [[] for _ in range(NUM_GAMES_PER_BATCH)]
     black_actions_from = [[] for _ in range(NUM_GAMES_PER_BATCH)]
     black_actions_to = [[] for _ in range(NUM_GAMES_PER_BATCH)]
-    white_scores = [None] * NUM_GAMES_PER_BATCH
-    black_scores = [None] * NUM_GAMES_PER_BATCH
+    white_scores = [[] for _ in range(NUM_GAMES_PER_BATCH)]
+    black_scores = [[] for _ in range(NUM_GAMES_PER_BATCH)]
 
     scores = [0, 0, 0]
 
-    for _ in range(MAX_TURNS_PER_GAME):
+    i = 0
+    while True:
+        if i == MAX_TURNS_PER_GAME:
+            for idx, board in boards.items():
+                white_scores[idx] = [0] * num_white_moves[idx]
+                black_scores[idx] = [0] * num_black_moves[idx]
+                scores[2] += 1
+            break
+
         # Filter out finished games
         boards_next = {}
         for idx, board in boards.items():
@@ -82,7 +90,7 @@ def play(white_engine, black_engine):
             if not board.is_legal(moves[i]):
                 print(moves[i])
                 print(board)
-                return
+                raise "Move not legal"
             board.push(moves[i])
             white_states[idx].append(np.expand_dims(X[i, :], axis=0))
             white_actions_from[idx].append(np.expand_dims(y_from[i, :], axis=0))
@@ -114,14 +122,16 @@ def play(white_engine, black_engine):
             if not board.is_legal(moves[i]):
                 print(moves[i])
                 print(board)
-                return
+                raise "Move not legal"
             board.push(moves[i])
             black_states[idx].append(np.expand_dims(X[i, :], axis=0))
             black_actions_from[idx].append(np.expand_dims(y_from[i, :], axis=0))
             black_actions_to[idx].append(np.expand_dims(y_to[i, :], axis=0))
             num_black_moves[idx] += 1
 
-        #print(board)
+        i += 1
+        print(board)
+
     # Flatten lists
     white_states = [a for game in white_states for a in game]
     black_states = [a for game in black_states for a in game]
@@ -144,15 +154,9 @@ def play(white_engine, black_engine):
     black_actions_to = np.array([black_actions_to[i] for i in black_idx])
     black_scores = np.array([black_scores[i] for i in black_idx])
 
-    return
-    (
-        white_states,
-        [white_actions_from, white_actions_to],
-        white_scores),
-    (
-        black_states,
-        [black_actions_from, black_actions_to],
-        black_scores), scores
+    return (white_states, [white_actions_from, white_actions_to], white_scores), \
+           (black_states, [black_actions_from, black_actions_to], black_scores), \
+           scores
 
 
 def get_filename_for_saving(net_type, start_time):
@@ -178,13 +182,13 @@ if __name__ == "__main__":
     white_model_hdf5 = "saved/white_model.hdf5"
     black_model_hdf5 = "saved/black_model.hdf5"
 
-    white_engine = PolicyEngine(white_model_hdf5)
-    black_engine = PolicyEngine(black_model_hdf5)
+    #  white_engine = PolicyEngine(white_model_hdf5)
+    #  black_engine = PolicyEngine(black_model_hdf5)
 
     print("Begin play")
     while True:
         white_sar, black_sar, scores = play(white_engine, black_engine)
-        print(scores)
+        print("White: %d   Black: %d   Draw: %d" % (scores[0], scores[1], scores[2]))
         break
         # train(white_engine, white_sar[0], white_sar[1], white_sar[2])
         # train(black_engine, black_sar[0], black_sar[1], black_sar[2])
