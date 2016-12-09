@@ -54,7 +54,8 @@ class PolicyEngine(ChessEngine):
             move = None
             num_non_nan = np.count_nonzero(~np.isnan(p))
             if num_non_nan == 0:
-                print("WARNING: Model predictions are all NaN", file=sys.stderr)
+                #  print("WARNING: Model predictions are all NaN", file=sys.stderr)
+                raise Exception("WARNING: Model predictions are all NaN")
             idx_random = np.random.choice(p.shape[0], min(NUM_TRIES, np.count_nonzero(p), num_non_nan), replace=False, p=p)
             for idx in idx_random:
                 from_square, to_square = np.unravel_index(idx, p_shape)
