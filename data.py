@@ -77,11 +77,13 @@ def state_from_board(board, hashable=False, featurized=False, black=False):
                     if piece == 'b':
                         break
                     elif piece == '1':
-                        state[i] = (1-color)*NUM_PIECES + piece_type - 1
-                        # row = i // NUM_ROWS
-                        # col = i % NUM_ROWS
-                        # state[row, col] = (1-color)*NUM_PIECES + piece_type - 1
-        state = str(state)
+                        if black:
+                            row = NUM_ROWS-1 - (i // NUM_ROWS)
+                            col = i % NUM_ROWS
+                            state[row*NUM_ROWS + col] = color*NUM_PIECES + piece_type
+                        else:
+                            state[i] = (1-color)*NUM_PIECES + piece_type
+        state = tuple(state)
     return state
 
 def featurized_state_from_board(board):
@@ -184,19 +186,30 @@ def featurized_state_from_board(board):
     phi = np.array([*phi_rooks, *phi_bishops, *phi_queens, white_pieces, black_pieces, free_spaces])
     return np.append(state, phi, axis=0)
 
-def action_from_move(move):
-    if type(move) is chess.Move:
-        a_from = np.zeros((NUM_SQUARES,))
-        a_to = np.zeros((NUM_SQUARES,))
-        a_from[move.from_square] = 1
-        a_to[move.to_square] = 1
-        return (a_from, a_to)
+def flip_color_square_idx(from_square, to_square):
+    row = NUM_ROWS-1 - (from_square // NUM_ROWS)
+    col = from_square % NUM_ROWS
+    from_square = row*NUM_ROWS + col
+    row = NUM_ROWS-1 - (to_square // NUM_ROWS)
+    col = to_square % NUM_ROWS
+    to_square = row*NUM_ROWS + col
+    return from_square, to_square
 
-def move_from_action(from_square, to_square):
+def action_from_move(move, black=False):
+    from_square = move.from_square
+    to_square = move.to_square
+    if black:
+        from_square, to_square = flip_color_square_idx(from_square, to_square)
+    a_from = np.zeros((NUM_SQUARES,))
+    a_to = np.zeros((NUM_SQUARES,))
+    a_from[from_square] = 1
+    a_to[to_square] = 1
+    return (a_from, a_to)
+
+def move_from_action(from_square, to_square, black=False):
+    if black:
+        from_square, to_square = flip_color_square_idx(from_square, to_square)
     return chess.Move(from_square, to_square)
-    # (from_square,) = np.where(a_from==1)
-    # (to_square,) = np.where(a_to==1)
-    # return chess.Move(from_square[0], to_square[0])
 
 class Dataset:
     def __init__(self, filename, loop=False):
@@ -331,6 +344,77 @@ class Dataset:
                     continue
 
                 yield s, a, r, s_prime, a_prime, new_game
+
+    def phi_action_sl(self, loop=False):
+        return self.state_action_sl(loop=loop, featurized=True)
+
+    def state_action_sl(self, loop=True, featurized=False):
+        """
+        Returns (state, action) tuple from white's perspective - flips black's perspective to match
+        - state: np.array [12 pieces x 64 squares]
+            - piece order:  wp wn wb wr wq wk bp bn bb br bq bk
+            - square order: a1 b1 c1 ... h8
+        - action: [np.array [1 x 64 squares], np.array [1 x 64 squares]] representing [from_board, to_board]
+        """
+        BATCH_SIZE = 32
+        idx_batch = 0
+        with open(self.filename) as pgn:
+            S = []
+            A_from = []
+            A_to = []
+            while True:
+                game = chess.pgn.read_game(pgn)
+                if game is None:
+                    if not loop:
+                        break
+                    print("\n******************************************")
+                    print("********** LOOPING OVER DATASET **********")
+                    print("******************************************\n")
+                    pgn.seek(0)
+                    continue
+
+                num_moves = int(game.headers["PlyCount"])
+                board = game.board()
+                node = game.root()
+
+                if num_moves <= 4:
+                    continue
+
+                # Make sure game was played all the way through
+                last_node = game.root()
+                while last_node.variations:
+                    last_node = last_node.variations[0]
+                if "forfeit" in last_node.comment:
+                    continue
+
+                black_turn = False
+                while node.variations:
+                    # Play white
+                    s = state_from_board(board, featurized=featurized, black=black_turn)
+                    move = node.variations[0].move
+                    a_from, a_to = action_from_move(move, black=black_turn)
+                    board.push(move)
+                    black_turn = not black_turn
+
+                    node = node.variations[0]
+
+                    S.append(s)
+                    A_from.append(a_from)
+                    A_to.append(a_to)
+                    idx_batch += 1
+
+                    if idx_batch == BATCH_SIZE:
+                        # Shuffle moves in game
+                        idx = list(np.random.permutation(len(S)))
+                        idx = list(range(len(S)))
+                        S_shuffle = [S[i] for i in idx]
+                        A_from_shuffle = [A_from[i] for i in idx]
+                        A_to_shuffle = [A_to[i] for i in idx]
+                        S = []
+                        A_from = []
+                        A_to = []
+                        idx_batch = 0
+                        yield np.array(S_shuffle), [np.array(A_from_shuffle), np.array(A_to_shuffle)]
 
     def white_phi_action_sl(self, loop=False):
         return self.white_state_action_sl(loop=loop, featurized=True)
