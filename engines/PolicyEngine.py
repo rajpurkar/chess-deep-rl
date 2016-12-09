@@ -18,7 +18,7 @@ class PolicyEngine(ChessEngine):
     def search(self, boards=None):
         if boards is None:
             boards = {0: self.board}
-
+        boards_list = []
         # Create X batch
         states = []
         for board in boards.values():
