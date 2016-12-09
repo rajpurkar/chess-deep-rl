@@ -51,7 +51,7 @@ class PolicyEngine(ChessEngine):
 
                 # Find max probability action
                 appended = False
-                for idx in np.argsort(p):
+                for idx in reversed(np.argsort(p).tolist()):
                     from_square, to_square = np.unravel_index(idx, p_shape)
                     move = data.move_from_action(from_square, to_square)
                     if board.is_legal(move):
