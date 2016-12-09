@@ -26,7 +26,7 @@ class PolicyEngine(ChessEngine):
             X = np.array(states)
 
             # Predict batch
-            y_hat_from, y_hat_to = self.model.predict(X, batch_size=batch_size, verbose=1)
+            y_hat_from, y_hat_to = self.model.predict(X, batch_size=batch_size, verbose=0)
 
             # Extract best legal move
             moves = []
@@ -51,7 +51,7 @@ class PolicyEngine(ChessEngine):
 
                 # Find max probability action
                 appended = False
-                for idx in np.argsort(p):
+                for idx in reversed(np.argsort(p).tolist()):
                     from_square, to_square = np.unravel_index(idx, p_shape)
                     move = data.move_from_action(from_square, to_square)
                     if board.is_legal(move):
