@@ -66,8 +66,9 @@ class ChessEngine:
         try:
             if input_tokens[0] == "startpos" and input_tokens[1] == "moves":
                 moves = input_tokens[2:]
-            elif input_tokens[0] == "fen" and input_tokens[2] == "moves":
-                moves = input_tokens[3:]
+            elif input_tokens[0] == "fen" and "moves" in input_tokens:
+                # TODO: fen broken
+                moves = input_tokens[input_tokens.index("moves")+1:]
             else:
                 return
         except:

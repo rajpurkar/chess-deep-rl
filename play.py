@@ -2,7 +2,7 @@ import chess
 import chess.uci
 
 # Load engines
-engine_w = chess.uci.popen_engine("engines/ValueBaselineEngine.py")
+engine_w = chess.uci.popen_engine("engines/QEngine.py")
 # engine_w = chess.uci.popen_engine("engines/ChessEngine.py")
 engine_b = chess.uci.popen_engine("engines/stockfish")
 print("Loaded engines")

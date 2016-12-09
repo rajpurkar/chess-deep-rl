@@ -6,7 +6,7 @@ import os
 NUM_GAMES_PER_BATCH = 128
 NUMBER_EPOCHS = 1  # some large number
 VERBOSE_LEVEL = 1
-
+MAX_TURNS_PER_GAME = 100
 
 def custom_result(board):
     if board.is_checkmate():
@@ -57,7 +57,7 @@ def play(white_engine, black_engine):
 
     scores = [0, 0, 0]
 
-    while True:
+    for _ in range(MAX_TURNS_PER_GAME):
         # Filter out finished games
         boards_next = {}
         for idx, board in boards.items():
@@ -150,12 +150,12 @@ def play(white_engine, black_engine):
     return (white_states, [white_actions_from, white_actions_to], white_scores), (black_states, [black_actions_from, black_actions_to], black_scores), scores
 
 
-"""
 def get_filename_for_saving(net_type, start_time):
     folder_name = FOLDER_TO_SAVE + net_type + '/' + start_time
     if not os.path.exists(folder_name):
         os.makedirs(folder_name)
     return folder_name + "/{epoch:02d}-{val_loss:.2f}.hdf5"
+
 
 import time
 import os
@@ -165,8 +165,8 @@ def train(engine, X, y, r):
 
     start_time = str(int(time.time()))
     checkpointer = ModelCheckpoint(filepath=get_filename_for_saving('policy_rl', start_time), verbose=2, save_best_only=True)
-    engine.model.fit(X, y, sample_weight=r, batch_size=BATCH_SIZE, nb_epoch=NUMBER_EPOCHS, callbacks=[checkpointer], verbose=VERBOSE_LEVEL)
-"""
+    engine.model.fit(X, y, sample_weight=r, nb_epoch=NUMBER_EPOCHS, callbacks=[checkpointer], verbose=VERBOSE_LEVEL)
+
 
 if __name__ == "__main__":
     print("Initializing engines")
