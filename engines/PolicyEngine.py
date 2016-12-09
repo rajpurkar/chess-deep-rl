@@ -26,7 +26,7 @@ class PolicyEngine(ChessEngine):
             X = np.array(states)
 
             # Predict batch
-            y_hat_from, y_hat_to = self.model.predict(X, batch_size=batch_size, verbose=1)
+            y_hat_from, y_hat_to = self.model.predict(X, batch_size=batch_size, verbose=0)
 
             # Extract best legal move
             moves = []

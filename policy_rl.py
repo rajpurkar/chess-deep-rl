@@ -4,17 +4,32 @@ import data
 import numpy as np
 import time
 
-white_model_hdf5 = "saved/policy/white-12.8.10.45-4.74.hdf5"
-black_model_hdf5 = "saved/policy/black-12.8.10.45-4.59.hdf5"
-NUM_GAMES_PER_BATCH = 128
+white_model_hdf5 = "saved/white_model.hdf5"
+black_model_hdf5 = "saved/black_model.hdf5"
+NUM_GAMES_PER_BATCH = 12
 
 NUMBER_EPOCHS = 1  # some large number
 VERBOSE_LEVEL = 1
 
+def custom_result(board):
+    if board.is_checkmate():
+        if board.turn == chess.WHITE:
+            print("YESSSSSSS")
+            return "0-1"
+        else:
+            print("YESSSSSSS")
+            return "1-0"
+
+    if board.is_insufficient_material() or not any(board.generate_legal_moves()):
+        print("NOOOOOOOO!!!")
+        return "1/2-1/2"
+
+    return "*"
+
 def get_result(board):
-    result = board.result()
+    result = custom_result(board)
     if result is not "*":
-        white_score = result.split("-")
+        white_score = result.split("-")[0]
         if len(white_score) > 1:
             return 0
         elif white_score is "0":
@@ -43,6 +58,8 @@ def play(white_engine, black_engine):
     white_scores = [None] * NUM_GAMES_PER_BATCH
     black_scores = [None] * NUM_GAMES_PER_BATCH
 
+    scores = [0, 0, 0]
+
     while True:
         # Filter out finished games
         boards_next = {}
@@ -51,6 +68,12 @@ def play(white_engine, black_engine):
             if result is not None:
                 white_scores[idx] = [result] * num_white_moves[idx]
                 black_scores[idx] = [-result] * num_black_moves[idx]
+                if result > 0:
+                    scores[0] += 1
+                elif result < 0:
+                    scores[1] += 1
+                else:
+                    scores[2] += 1
                 continue
             boards_next[idx] = board
         boards = boards_next
@@ -77,6 +100,12 @@ def play(white_engine, black_engine):
             if result is not None:
                 white_scores[idx] = [result] * num_white_moves[idx]
                 black_scores[idx] = [-result] * num_black_moves[idx]
+                if result > 0:
+                    scores[0] += 1
+                elif result < 0:
+                    scores[1] += 1
+                else:
+                    scores[2] += 1
                 continue
             boards_next[idx] = board
         boards = boards_next
@@ -96,7 +125,7 @@ def play(white_engine, black_engine):
             black_actions_to[idx].append(np.expand_dims(y_to[i,:], axis=0))
             num_black_moves[idx] += 1
 
-        print(board)
+        #print(board)
     # Flatten lists
     white_states = [a for game in white_states for a in game]
     black_states = [a for game in black_states for a in game]
@@ -119,7 +148,7 @@ def play(white_engine, black_engine):
     black_actions_to = np.array([black_actions_to[i] for i in black_idx])
     black_scores = np.array([black_scores[i] for i in black_idx])
 
-    return (white_states, [white_actions_from, white_actions_to], white_scores), (black_states, [black_actions_from, black_actions_to], black_scores)
+    return (white_states, [white_actions_from, white_actions_to], white_scores), (black_states, [black_actions_from, black_actions_to], black_scores), scores
 
 def get_filename_for_saving(net_type, start_time):
     folder_name = FOLDER_TO_SAVE + net_type + '/' + start_time
@@ -141,8 +170,8 @@ if __name__ == "__main__":
 
     print("Begin play")
     while True:
-        white_sar, black_sar = play(white_engine, black_engine)
-        print(white_sar[2])
+        white_sar, black_sar, scores = play(white_engine, black_engine)
+        print(scores)
         break
         train(white_engine, white_sar[0], white_sar[1], white_sar[2])
         train(black_engine, black_sar[0], black_sar[1], black_sar[2])
