@@ -1,25 +1,27 @@
 #!/usr/bin/env python3
-from engines.ChessEngine import ChessEngine
 from keras.models import load_model
 import numpy as np
 import sys
 sys.path.append('.')
+from engines.ChessEngine import ChessEngine
 import data
 import random
+NUM_TRIES = 10
 
 class PolicyEngine(ChessEngine):
     def __init__(self, model_hdf5=None, epsilon=0.1):
         super().__init__()
         if model_hdf5 is not None:
             self.model = load_model(model_hdf5)
-            self.epsilon = epsilon
+            # self.epsilon = epsilon
 
     def search(self, boards=None):
         if boards is None:
             boards = {0: self.board}
-
+        boards_list = []
         # Create X batch
         states = []
+        boards_list = []
         for board in boards.values():
             states.append(data.state_from_board(board, featurized=True))
             boards_list.append(board)
@@ -29,12 +31,12 @@ class PolicyEngine(ChessEngine):
         # Predict batch
         y_hat_from, y_hat_to = self.model.predict(X, batch_size=batch_size, verbose=0)
 
-        # Extract best legal move
         moves = []
         y_from = []
         y_to = []
         for i in range(y_hat_from.shape[0]):
             board = boards_list[i]
+            """
             if random.random() < self.epsilon:
                 move = random.choice(list(board.generate_legal_moves()))
                 a_from, a_to = data.action_from_move(move)
@@ -42,32 +44,32 @@ class PolicyEngine(ChessEngine):
                 y_from.append(a_from)
                 y_to.append(a_to)
                 continue
-
+            """
             # Multiply probabilities
-            p = np.outer(y_hat_from[i,:], y_hat_to[i,:])
+            p = np.outer(y_hat_from[i], y_hat_to[i])
             p_shape = p.shape
             p = p.reshape((-1,))
 
             # Find max probability action
-            appended = False
-            for idx in reversed(np.argsort(p).tolist()):
+            move = None
+            num_non_nan = np.count_nonzero(~np.isnan(p))
+            if num_non_nan == 0:
+                #  print("WARNING: Model predictions are all NaN", file=sys.stderr)
+                raise Exception("WARNING: Model predictions are all NaN")
+            idx_random = np.random.choice(p.shape[0], min(NUM_TRIES, np.count_nonzero(p), num_non_nan), replace=False, p=p)
+            for idx in idx_random:
                 from_square, to_square = np.unravel_index(idx, p_shape)
-                move = data.move_from_action(from_square, to_square)
-                if board.is_legal(move):
-                    appended = True
-                    moves.append(move)
-                    a_from, a_to = data.action_from_move(move)
-                    y_from.append(a_from)
-                    y_to.append(a_to)
+                move_attempt = data.move_from_action(from_square, to_square)
+                if board.is_legal(move_attempt):
+                    move = move_attempt
                     break
-
-            if not appended:
+            if move is None:
                 move = random.choice(list(board.generate_legal_moves()))
-                a_from, a_to = data.action_from_move(move)
-                moves.append(move)
-                y_from.append(a_from)
-                y_to.append(a_to)
-
+            moves.append(move)
+            a_from, a_to = data.action_from_move(move)
+            y_from.append(a_from)
+            y_to.append(a_to)
+        
         # Return moves for UCI
         if moves:
             self.moves = [moves[0]]
@@ -79,5 +81,5 @@ class PolicyEngine(ChessEngine):
         return X, [y_from, y_to], moves
 
 if __name__ == "__main__":
-    engine = ValueBaselineEngine("./saved/1480896779-06-0.40.hdf5")
+    engine = PolicyEngine("./saved/black_model.hdf5")
     engine.run()
