@@ -17,15 +17,11 @@ class PolicyEngine(ChessEngine):
 
     def search(self, boards=None):
         if boards is None:
-            boards = {0: self.board}
-        boards_list = []
+            boards = [self.board]
+
         # Create X batch
-        states = []
-        boards_list = []
-        for board in boards.values():
-            states.append(data.state_from_board(board, featurized=True))
-            boards_list.append(board)
-        batch_size = len(states)
+        batch_size = len(boards)
+        states = [data.state_from_board(board, featurized=True, black=self.is_black) for board in boards]
         X = np.array(states)
 
         # Predict batch
@@ -34,8 +30,8 @@ class PolicyEngine(ChessEngine):
         moves = []
         y_from = []
         y_to = []
-        for i in range(y_hat_from.shape[0]):
-            board = boards_list[i]
+        num_random = 0
+        for i, board in enumerate(boards):
             # Multiply probabilities
             p = np.outer(y_hat_from[i], y_hat_to[i])
             p_shape = p.shape
@@ -55,6 +51,7 @@ class PolicyEngine(ChessEngine):
                     move = move_attempt
                     break
             if move is None:
+                num_random += 1
                 move = random.choice(list(board.generate_legal_moves()))
             moves.append(move)
             a_from, a_to = data.action_from_move(move, black=self.is_black)
@@ -67,6 +64,7 @@ class PolicyEngine(ChessEngine):
         else:
             self.moves = None
 
+        print("Random moves: %d out of %d" % (num_random, batch_size), "black" if self.is_black else "white")
         y_from = np.array(y_from)
         y_to = np.array(y_to)
         return X, [y_from, y_to], moves
