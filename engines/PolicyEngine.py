@@ -51,10 +51,12 @@ class PolicyEngine(ChessEngine):
             p = p.reshape((-1,))
 
             # Find max probability action
-            # for idx in reversed(np.argsort(p).tolist()):
             move = None
-            for _ in range(NUM_TRIES):
-                idx = np.random.choice(p.shape[0], p=p.flatten())
+            num_non_nan = np.count_nonzero(~np.isnan(p))
+            if num_non_nan == 0:
+                print("WARNING: Model predictions are all NaN", file=sys.stderr)
+            idx_random = np.random.choice(p.shape[0], min(NUM_TRIES, np.count_nonzero(p), num_non_nan), replace=False, p=p)
+            for idx in idx_random:
                 from_square, to_square = np.unravel_index(idx, p_shape)
                 move_attempt = data.move_from_action(from_square, to_square)
                 if board.is_legal(move_attempt):
@@ -78,5 +80,5 @@ class PolicyEngine(ChessEngine):
         return X, [y_from, y_to], moves
 
 if __name__ == "__main__":
-    engine = PolicyEngine("./saved/policy/black_model.hdf5")
+    engine = PolicyEngine("./saved/black_model.hdf5")
     engine.run()
