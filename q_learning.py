@@ -8,16 +8,17 @@ import cProfile
 dim_S = data.NUM_SQUARES * data.NUM_PIECES * data.NUM_COLORS
 dim_A = dim_S * dim_S
 
-filename = "ficsgamesdb_1999-2015_standard2000_nomovetimes"
+#  filename = "ficsgamesdb_1999-2015_standard2000_nomovetimes"
+filename = "large-ccrl"
 datafile = "data/%s.pgn" % filename
-picklefile = "engines/sarsa_Q_%s-%s.pickle" % (filename, time.time())
+picklefile = "saved/black_sarsa_Q_%s-%s.pickle" % (filename, time.time())
 
 def sarsa_lambda(data, LAMBDA=0.99, GAMMA=0.99, ALPHA=1/np.sqrt(dim_S)):
     Q = {}
     N = {}
     try:
         i = 0
-        for s, a, r, s_prime, a_prime, new_game in tqdm(data.white_sarsa()):
+        for s, a, r, s_prime, a_prime, new_game in tqdm(data.black_sarsa()):
             if new_game:
                 N = {}
             if s not in N:
@@ -39,7 +40,7 @@ def sarsa_lambda(data, LAMBDA=0.99, GAMMA=0.99, ALPHA=1/np.sqrt(dim_S)):
                     Q[s_hat][a_hat] += ALPHA * delta * N[s_hat][a_hat]
                     N[s_hat][a_hat] *= GAMMA * LAMBDA
 
-            if i % 25000 == 0:
+            if i % 500000 == 0:
                 try:
                     with open(picklefile, "wb") as f:
                         pickle.dump(Q, f)

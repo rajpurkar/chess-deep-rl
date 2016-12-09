@@ -4,8 +4,8 @@ import numpy as np
 import os
 
 FOLDER_TO_SAVE = "./saved/"
-NUM_GAMES_PER_BATCH = 10#128
-NUMBER_EPOCHS = 1  # some large number
+NUM_GAMES_PER_BATCH = 1#128
+NUMBER_EPOCHS = 10  # some large number
 VERBOSE_LEVEL = 1
 MAX_TURNS_PER_GAME = 100
 
@@ -185,9 +185,17 @@ def train(engine, X, y, r, engine_type):
     start_time = str(int(time.time()))
     #  checkpointer = ModelCheckpoint(filepath=get_filename_for_saving(engine_type + '_policy_rl', start_time), verbose=2, save_best_only=True)
     #  engine.model.fit(X, y, sample_weight=[r,r], nb_epoch=NUMBER_EPOCHS, callbacks=[checkpointer], verbose=VERBOSE_LEVEL)
-    learning_rate = engine.model.optimizer.lr.get_value()
+    if r[0] == 0:
+        return
+
+    learning_rate = abs(engine.model.optimizer.lr.get_value())
+    if r[0] == 1:
+        engine.model.optimizer.lr.set_value(learning_rate)
+    else:
+        engine.model.optimizer.lr.set_value(-learning_rate)
     sample_weight = learning_rate * r
-    engine.model.fit(X, y, sample_weight=[sample_weight,sample_weight], nb_epoch=NUMBER_EPOCHS, verbose=VERBOSE_LEVEL)
+    #  engine.model.fit(X, y, sample_weight=[sample_weight,sample_weight], nb_epoch=NUMBER_EPOCHS, verbose=VERBOSE_LEVEL)
+    engine.model.fit(X, y, nb_epoch=NUMBER_EPOCHS, verbose=VERBOSE_LEVEL)
 
 
 if __name__ == "__main__":
