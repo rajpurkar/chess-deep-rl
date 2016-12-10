@@ -9,6 +9,7 @@ NUMBER_EPOCHS = 10000  # some large number
 SAMPLES_PER_EPOCH = 10016  # tune for feedback/speed balance
 VERBOSE_LEVEL = 1
 
+BATCH_SIZE = 32
 NUM_PARALLELL_GAMES = 128
 MAX_TURNS_PER_GAME = 100
 
@@ -87,20 +88,21 @@ class SelfPlayController:
             result = get_result(board)
             if result is not None or len(self.white_states[i]) > MAX_TURNS_PER_GAME:
                 # Add game to finished pool
-                if result >= 1:
-                    self.finished_win_states        += self.white_states[i]
-                    self.finished_win_actions_from  += self.white_actions_from[i]
-                    self.finished_win_actions_to    += self.white_actions_to[i]
-                    self.finished_lose_states       += self.black_states[i]
-                    self.finished_lose_actions_from += self.black_actions_from[i]
-                    self.finished_lose_actions_to   += self.black_actions_to[i]
-                elif result <= -1:
-                    self.finished_win_states        += self.black_states[i]
-                    self.finished_win_actions_from  += self.black_actions_from[i]
-                    self.finished_win_actions_to    += self.black_actions_to[i]
-                    self.finished_lose_states       += self.white_states[i]
-                    self.finished_lose_actions_from += self.white_actions_from[i]
-                    self.finished_lose_actions_to   += self.white_actions_to[i]
+                if result is not None:
+                    if result >= 1:
+                        self.finished_win_states        += self.white_states[i]
+                        self.finished_win_actions_from  += self.white_actions_from[i]
+                        self.finished_win_actions_to    += self.white_actions_to[i]
+                        self.finished_lose_states       += self.black_states[i]
+                        self.finished_lose_actions_from += self.black_actions_from[i]
+                        self.finished_lose_actions_to   += self.black_actions_to[i]
+                    elif result <= -1:
+                        self.finished_win_states        += self.black_states[i]
+                        self.finished_win_actions_from  += self.black_actions_from[i]
+                        self.finished_win_actions_to    += self.black_actions_to[i]
+                        self.finished_lose_states       += self.white_states[i]
+                        self.finished_lose_actions_from += self.white_actions_from[i]
+                        self.finished_lose_actions_to   += self.white_actions_to[i]
 
                 # Reset board
                 self.boards[i] = chess.Board()
@@ -119,14 +121,14 @@ class SelfPlayController:
                     self.white_actions_to[i].append(y_to[0])
 
                 # Update scoreboard
-                if result >= 1:
+                if result is None:
+                    self.scoreboard[3] += 1
+                elif result >= 1:
                     self.scoreboard[0] += 1
                 elif result <= -1:
                     self.scoreboard[1] += 1
-                elif result == 0:
-                    self.scoreboard[2] += 1
                 else:
-                    self.scoreboard[3] += 1
+                    self.scoreboard[2] += 1
 
     def play_generator(self):
         self.boards = [chess.Board() for i in range(NUM_PARALLELL_GAMES)]
@@ -161,13 +163,13 @@ class SelfPlayController:
             self.black_turn = not self.black_turn
             self.collect_game_results()
 
-            os.system("clear")
-            print(self.boards[i])
-            print("White: %d   Black: %d   Draw: %d   Endless: %d" % (scores[0], scores[1], scores[2], scores[3]))
+            # os.system("clear")
+            print(self.boards[0])
+            print("White: %d   Black: %d   Draw: %d   Endless: %d" % tuple(self.scoreboard))
 
             # Yield won games
-            while len(finished_win_states) > BATCH_SIZE:
-                idx_random = list(np.random.permutation(len(finished_win_states)))
+            while len(self.finished_win_states) > BATCH_SIZE:
+                idx_random = list(np.random.permutation(len(self.finished_win_states)))
                 win_states_shuffle       = [self.finished_win_states[idx] for idx in idx_random]
                 win_actions_from_shuffle = [self.finished_win_actions_from[idx] for idx in idx_random]
                 win_actions_to_shuffle   = [self.finished_win_actions_to[idx] for idx in idx_random]
@@ -178,14 +180,14 @@ class SelfPlayController:
                 self.finished_win_actions_from = win_actions_from_shuffle[BATCH_SIZE:]
                 self.finished_win_actions_to   = win_actions_to_shuffle[BATCH_SIZE:]
 
-                learning_rate = abs(engine.model.optimizer.lr.get_value())
-                engine.model.optimizer.lr.set_value(learning_rate)
+                learning_rate = abs(self.white_engine.model.optimizer.lr.get_value())
+                self.white_engine.model.optimizer.lr.set_value(learning_rate)
 
                 yield X_win, [y_from_win, y_to_win]
 
             # Yield lost games
-            while len(finished_lose_states) > BATCH_SIZE:
-                idx_random = list(np.random.permutation(len(finished_win_states)))
+            while len(self.finished_lose_states) > BATCH_SIZE:
+                idx_random = list(np.random.permutation(len(self.finished_win_states)))
                 lose_states_shuffle       = [self.finished_lose_states[idx] for idx in idx_random]
                 lose_actions_from_shuffle = [self.finished_lose_actions_from[idx] for idx in idx_random]
                 lose_actions_to_shuffle   = [self.finished_lose_actions_to[idx] for idx in idx_random]
@@ -196,8 +198,8 @@ class SelfPlayController:
                 self.finished_lose_actions_from = lose_actions_from_shuffle[BATCH_SIZE:]
                 self.finished_lose_actions_to   = lose_actions_to_shuffle[BATCH_SIZE:]
 
-                learning_rate = abs(engine.model.optimizer.lr.get_value())
-                engine.model.optimizer.lr.set_value(-learning_rate)
+                learning_rate = abs(self.white_engine.model.optimizer.lr.get_value())
+                self.white_engine.model.optimizer.lr.set_value(-learning_rate)
 
                 yield X_lose, [y_from_lose, y_to_lose]
 
@@ -302,7 +304,7 @@ def log_loss(y_true, y_pred):
     '''
     return -y_true * K.log(K.clip(y_pred, K.epsilon(), 1.0 - K.epsilon()))
 
-def train(controller):
+def train(controller, engine):
     from keras.callbacks import ModelCheckpoint
 
     start_time = str(int(time.time()))
@@ -314,7 +316,7 @@ def train(controller):
 
     engine.model.fit_generator(
         controller.play_generator(),
-        samples_per_epoch = SAMPLES_PER_EPOCH
+        samples_per_epoch = SAMPLES_PER_EPOCH,
         nb_epoch          = NUMBER_EPOCHS,
         # callbacks         = [checkpointer],
         verbose           = VERBOSE_LEVEL)

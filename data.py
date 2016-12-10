@@ -12,6 +12,8 @@ NUM_COLORS = len(chess.COLORS)
 NUM_SQUARES = len(chess.SQUARE_NAMES)
 NUM_COLS = 8
 NUM_ROWS = 8
+BATCH_SIZE = 32
+POOL_SIZE = 32
 
 GAMMA = 0.99
 
@@ -356,8 +358,6 @@ class Dataset:
             - square order: a1 b1 c1 ... h8
         - action: [np.array [1 x 64 squares], np.array [1 x 64 squares]] representing [from_board, to_board]
         """
-        BATCH_SIZE = 32
-        POOL_SIZE = 256
         idx_batch = 0
         with open(self.filename) as pgn:
             S = []
