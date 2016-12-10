@@ -7,7 +7,7 @@ np.random.seed(20)
 
 FOLDER_TO_SAVE = "./saved/"
 NUMBER_EPOCHS = 10000  # some large number
-SAMPLES_PER_EPOCH = 10016  # tune for feedback/speed balance
+SAMPLES_PER_EPOCH = 12800  # tune for feedback/speed balance
 VERBOSE_LEVEL = 1
 
 
@@ -21,13 +21,13 @@ def build_network(**kwargs):
 
     defaults = {
         "board_side_length": 8,
-        "conv_layers": 4,
+        "conv_layers": 6,
         "num_filters": 32,
-        "dropout": 0.3,
-        "dense_layers": 2,
-        "dense_hidden": 64,
+        "dropout": 0.4,
+        "dense_layers": 4,
+        "dense_hidden": 32,
         "output_size": 64,
-        "conditioned_architecture": True
+        "conditioned_architecture": False
     }
     params = defaults
     params.update(kwargs)
@@ -95,20 +95,21 @@ def build_network(**kwargs):
 
     model = Model(conv_input, [output_from, output_to])
 
-    model.compile('adamax', 'categorical_crossentropy', metrics=['accuracy', 'top_k_categorical_accuracy'])
+    model.compile('nadam', 'categorical_crossentropy', metrics=['accuracy', 'top_k_categorical_accuracy'])
     
     return model
 
 
 def get_folder_name(start_time):
-    folder_name = FOLDER_TO_SAVE + 'policy/' + start_time
+    folder_name = FOLDER_TO_SAVE + 'agnostic-policy/' + start_time
     if not os.path.exists(folder_name):
         os.makedirs(folder_name)
     return folder_name
 
 
 def get_filename_for_saving(start_time):
-    return get_folder_name(start_time) + "/{epoch:02d}-{val_loss:.2f}.hdf5"
+    saved_filename = get_folder_name(start_time) + "/{epoch:02d}-{val_loss:.2f}.hdf5"
+    return saved_filename
 
 
 def plot_model(model, start_time):
@@ -121,13 +122,13 @@ def plot_model(model, start_time):
 
 
 def train(net_type):
-    d = Dataset('data/large-ccrl.pgn')
+    d = Dataset('data/large-ccrl_train.pgn')
     start_time = str(int(time.time()))
-    generator_fn = d.white_state_action_sl
-    d_test = Dataset('data/small_test.pgn')
+    generator_fn = d.state_action_sl
+    d_test = Dataset('data/large-ccrl_test.pgn')
     featurized = True
     X_val, y_from_val, y_to_val = d_test.load(
-        'white_state_action_sl',
+        'state_action_sl',
         featurized=featurized,
         refresh=False)
     model = build_network(board_num_channels=X_val[0].shape[0])
