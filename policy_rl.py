@@ -112,6 +112,11 @@ class SelfPlayController:
                 else:
                     self.scoreboard[2] += 1
 
+                # os.system("clear")
+                # print(self.boards[0])
+                print("White: %d   Black: %d   Draw: %d   Endless: %d" % tuple(self.scoreboard))
+
+
     def play_generator(self):
         self.boards = [chess.Board() for i in range(NUM_PARALLELL_GAMES)]
 
@@ -144,10 +149,6 @@ class SelfPlayController:
             self.play_engine_move(self.black_engine, self.black_states, self.black_actions_from, self.black_actions_to)
             self.black_turn = not self.black_turn
             self.collect_game_results()
-
-            # os.system("clear")
-            # print(self.boards[0])
-            print("White: %d   Black: %d   Draw: %d   Endless: %d" % tuple(self.scoreboard))
 
             # Yield won games
             while len(self.finished_win_states) > BATCH_SIZE:
