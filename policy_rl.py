@@ -2,18 +2,18 @@ from engines.PolicyEngine import PolicyEngine
 import chess
 import numpy as np
 import os
-import time
 import random
 
-FOLDER_TO_SAVE = "./saved/policy_rl/"
+FOLDER_TO_SAVE = "saved/policy_rl/"
 
 BATCH_SIZE          = 32
 SAMPLES_PER_EPOCH   = 1*BATCH_SIZE
 NUMBER_EPOCHS       = 10
-VERBOSE_LEVEL       = 1
+VERBOSE_LEVEL       = 2
 
 NUM_PARALLELL_GAMES = 128
 MAX_TURNS_PER_GAME  = 100
+SIZE_MODEL_POOL     = 100
 
 def custom_result(board):
     """
@@ -146,7 +146,7 @@ class SelfPlayController:
             self.collect_game_results()
 
             # os.system("clear")
-            print(self.boards[0])
+            # print(self.boards[0])
             print("White: %d   Black: %d   Draw: %d   Endless: %d" % tuple(self.scoreboard))
 
             # Yield won games
@@ -185,23 +185,26 @@ class SelfPlayController:
 
                 yield X_lose, [y_from_lose, y_to_lose]
 
-def get_filename_for_saving(start_time):
+def get_filename_for_saving():
+    import time
+
+    start_time = str(int(time.time()))
+
     folder_name = FOLDER_TO_SAVE
-    if not os.path.exists(folder_name):
+    if not os.path.isdir(folder_name):
         os.makedirs(folder_name)
     # return folder_name + "/{epoch:02d}-{loss:.2f}.hdf5"
-    return folder_name + "/" + start_time + ".hdf5"
+    return folder_name + start_time + ".hdf5"
 
 def train(controller, engine):
     from keras.callbacks import ModelCheckpoint
 
-    start_time = str(int(time.time()))
-    filename = get_filename_for_saving(start_time),
+    filename = get_filename_for_saving()
 
     checkpointer = ModelCheckpoint(
         filepath       = filename,
-        verbose        = 2,
-        save_best_only = True)
+        verbose        = 2)
+        # save_best_only = True)
 
     engine.model.fit_generator(
         controller.play_generator(),
@@ -210,6 +213,8 @@ def train(controller, engine):
         callbacks         = [checkpointer],
         verbose           = VERBOSE_LEVEL)
 
+    if not os.path.isfile(filename):
+        return None
     return filename
 
 if __name__ == "__main__":
@@ -225,4 +230,7 @@ if __name__ == "__main__":
         controller = SelfPlayController(white_engine, black_engine)
 
         saved_model = train(controller, white_engine)
-        black_model_pool.append(saved_model)
+        if saved_model is not None:
+            black_model_pool.append(saved_model)
+            if len(black_model_pool) > SIZE_MODEL_POOL:
+                black_model_pool.pop()
