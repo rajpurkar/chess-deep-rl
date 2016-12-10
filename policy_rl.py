@@ -306,8 +306,11 @@ def train(controller):
     from keras.callbacks import ModelCheckpoint
 
     start_time = str(int(time.time()))
-    #  checkpointer = ModelCheckpoint(filepath=get_filename_for_saving(engine_type + '_policy_rl', start_time), verbose=2, save_best_only=True)
-    #  engine.model.fit(X, y, sample_weight=[r,r], nb_epoch=NUMBER_EPOCHS, callbacks=[checkpointer], verbose=VERBOSE_LEVEL)
+
+    checkpointer = ModelCheckpoint(
+        filepath       = get_filename_for_saving(engine_type + '_policy_rl', start_time),
+        verbose        = 2,
+        save_best_only = True)
 
     engine.model.fit_generator(
         controller.play_generator(),
@@ -316,14 +319,13 @@ def train(controller):
         # callbacks         = [checkpointer],
         verbose           = VERBOSE_LEVEL)
 
-
 if __name__ == "__main__":
-    print("Initializing engines")
-    white_model_hdf5 = "saved/white_model.hdf5"
-    black_model_hdf5 = "saved/black_model.hdf5"
+    white_model_hdf5 = "saved/sl_model.hdf5"
+    black_model_hdf5 = "saved/sl_model.hdf5"
+    while True:
+        print("Initializing engines")
+        white_engine = PolicyEngine(white_model_hdf5)
+        black_engine = PolicyEngine(black_model_hdf5, black=True)
+        controller = SelfPlayController(white_engine, black_engine)
 
-    white_engine = PolicyEngine(white_model_hdf5)
-    black_engine = PolicyEngine(black_model_hdf5, black=True)
-    controller = SelfPlayController(white_engine, black_engine)
-
-    train(controller)
+        train(controller)
