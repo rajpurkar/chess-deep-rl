@@ -26,7 +26,6 @@ def build_network(**kwargs):
         "dense_layers": 2,
         "dense_hidden": 64,
         "output_size": 1,
-        "conditioned_architecture": True
     }
     params = defaults
     params.update(kwargs)
@@ -78,26 +77,30 @@ def build_network(**kwargs):
     model.compile('adamax', 'mse', metrics=['mean_squared_error'])
     return model
 
-def plot_model(model, net_type, start_time):
+
+def get_folder_name(start_time):
+    folder_name = FOLDER_TO_SAVE + 'value/' + start_time
+    if not os.path.exists(folder_name):
+        os.makedirs(folder_name)
+    return folder_name
+
+
+def get_filename_for_saving(start_time):
+    saved_filename = get_folder_name(start_time) + "/{epoch:02d}-{val_loss:.2f}.hdf5"
+    return saved_filename
+
+
+def plot_model(model, start_time):
     from keras.utils.visualize_util import plot
-    folder_name = FOLDER_TO_SAVE + net_type + '/' + start_time
-    if not os.path.exists(folder_name):
-        os.makedirs(folder_name)
-    plot(model,
-        to_file          = FOLDER_TO_SAVE + net_type + '/' + start_time + '/model.png',
-        show_shapes      = True,
-        show_layer_names = False)
-
-
-def get_filename_for_saving(net_type, start_time):
-    folder_name = FOLDER_TO_SAVE + net_type + '/' + start_time
-    if not os.path.exists(folder_name):
-        os.makedirs(folder_name)
-    return folder_name + "/{epoch:02d}-{val_loss:.2f}.hdf5"
+    plot(
+        model,
+        to_file=get_folder_name(start_time) + '/model.png',
+        show_shapes=True,
+        show_layer_names=False)
 
 
 def train():
-    featurized = False
+    featurized = True
 
     d = Dataset('data/large-ccrl_train.pgn')
     generator_fn = d.state_value
@@ -109,8 +112,10 @@ def train():
 
     model = build_network(board_num_channels=X_val[0].shape[0])
     start_time = str(int(time.time()))
-    plot_model(model, 'value', start_time)
-
+    try:
+        plot_model(model, start_time)
+    except:
+        print("Skipping plot")
     from keras.callbacks import ModelCheckpoint
     checkpointer = ModelCheckpoint(
         filepath       = get_filename_for_saving('value', start_time),
