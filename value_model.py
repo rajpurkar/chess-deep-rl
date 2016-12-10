@@ -22,7 +22,7 @@ def build_network(**kwargs):
         "board_side_length": 8,
         "conv_layers": 4,
         "num_filters": 32,
-        "dropout": 0.3,
+        "dropout": 0.5,
         "dense_layers": 2,
         "dense_hidden": 64,
         "output_size": 1,
@@ -74,7 +74,7 @@ def build_network(**kwargs):
 
     model = Model(conv_input, value)
 
-    model.compile('adamax', 'mse', metrics=['mean_squared_error'])
+    model.compile('adamax', 'mse', metrics=['mean_squared_error', 'mean_absolute_error'])
     return model
 
 
