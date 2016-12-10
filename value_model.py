@@ -118,7 +118,7 @@ def train():
         print("Skipping plot")
     from keras.callbacks import ModelCheckpoint
     checkpointer = ModelCheckpoint(
-        filepath       = get_filename_for_saving('value', start_time),
+        filepath       = get_filename_for_saving(start_time),
         verbose        = 2,
         save_best_only = True)
 
