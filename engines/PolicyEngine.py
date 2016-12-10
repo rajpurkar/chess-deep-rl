@@ -6,7 +6,7 @@ sys.path.append('.')
 from engines.ChessEngine import ChessEngine
 import data
 import random
-NUM_TRIES = 10
+NUM_TRIES = 20
 
 class PolicyEngine(ChessEngine):
     def __init__(self, model_hdf5=None, black=False):
