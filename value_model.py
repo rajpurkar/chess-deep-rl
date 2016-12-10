@@ -7,7 +7,7 @@ np.random.seed(20)
 
 FOLDER_TO_SAVE = "./saved/"
 NUMBER_EPOCHS = 10000  # some large number
-SAMPLES_PER_EPOCH = 40064  # tune for feedback/speed balance
+SAMPLES_PER_EPOCH = 10016  # tune for feedback/speed balance
 VERBOSE_LEVEL = 1
 
 
@@ -55,7 +55,7 @@ def value_network(**kwargs):
     """ Use a variation of the ROCAlphaGo Value Network. """
     conv_input, flattened = common_network(**kwargs)
     dense_1 = Dense(128, activation="relu")(flattened)
-    dense_2 = Dense(128, activation="relu")(dense_2)
+    dense_2 = Dense(128, activation="relu")(dense_1)
     output = Dense(1, activation="tanh")(dense_2)
     model = Model(conv_input, output)
     model.compile('adamax', 'mse')
@@ -95,10 +95,13 @@ def policy_network(**kwargs):
     model.compile('adam', 'categorical_crossentropy', metrics=['accuracy'])
     return model
 
-def plot_model(model, start_time):
+def plot_model(model, net_type, start_time):
     from keras.utils.visualize_util import plot
+    folder_name = FOLDER_TO_SAVE + net_type + '/' + start_time
+    if not os.path.exists(folder_name):
+        os.makedirs(folder_name)
     plot(model,
-        to_file          = get_folder_name(start_time) + '/model.png',
+        to_file          = FOLDER_TO_SAVE + net_type + '/' + start_time + '/model.png',
         show_shapes      = True,
         show_layer_names = False)
 
@@ -113,18 +116,20 @@ def get_filename_for_saving(net_type, start_time):
 def train(net_type):
     featurized = False
 
-    d = Dataset('data/medium.pgn')
+    d = Dataset('data/large-ccrl_train.pgn')
     generator_fn = d.state_value
 
-    d_test = Dataset('data/small_test.pgn')
-    X_val, y_val = d_test.load('state_value', featurized=featurized, refresh=False)
+    d_test = Dataset('data/large-ccrl_test.pgn')
+    X_val, y_val = d_test.load('state_value',
+        featurized = featurized,
+        refresh    = False)
 
     if net_type == "value":
         model = value_network(board_num_channels=X_val[0].shape[0])
     else:
         model = policy_network(board_num_channels=X_val[0].shape[0])
     start_time = str(int(time.time()))
-    plot_model(model, start_time)
+    plot_model(model, net_type, start_time)
 
     from keras.callbacks import ModelCheckpoint
     checkpointer = ModelCheckpoint(
@@ -132,7 +137,7 @@ def train(net_type):
         verbose        = 2,
         save_best_only = True)
 
-    model.fit_generator(generator_fn(),
+    model.fit_generator(generator_fn(featurized=featurized),
         samples_per_epoch = SAMPLES_PER_EPOCH,
         nb_epoch          = NUMBER_EPOCHS,
         callbacks         = [checkpointer],
