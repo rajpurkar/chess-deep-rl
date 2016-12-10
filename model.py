@@ -21,13 +21,13 @@ def build_network(**kwargs):
 
     defaults = {
         "board_side_length": 8,
-        "conv_layers": 6,
+        "conv_layers": 3,
         "num_filters": 32,
         "dropout": 0.4,
         "dense_layers": 4,
-        "dense_hidden": 32,
+        "dense_hidden": 128,
         "output_size": 64,
-        "conditioned_architecture": False
+        "conditioned_architecture": True
     }
     params = defaults
     params.update(kwargs)
@@ -95,7 +95,7 @@ def build_network(**kwargs):
 
     model = Model(conv_input, [output_from, output_to])
 
-    model.compile('nadam', 'categorical_crossentropy', metrics=['accuracy', 'top_k_categorical_accuracy'])
+    model.compile('adamax', 'categorical_crossentropy', metrics=['accuracy', 'top_k_categorical_accuracy'])
     
     return model
 

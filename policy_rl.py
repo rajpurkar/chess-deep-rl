@@ -218,7 +218,6 @@ def train(controller, engine):
     return filename
 
 if __name__ == "__main__":
-    print("Initializing engines")
     white_model_hdf5 = "saved/sl_model.hdf5"
     white_engine = PolicyEngine(white_model_hdf5)
 

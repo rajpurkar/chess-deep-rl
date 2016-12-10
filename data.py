@@ -411,8 +411,8 @@ class Dataset:
                         A_from_shuffle = [A_from[i] for i in idx]
                         A_to_shuffle = [A_to[i] for i in idx]
                         S = S_shuffle[BATCH_SIZE:]
-                        A_from = A_from[BATCH_SIZE:]
-                        A_to = A_to[BATCH_SIZE:]
+                        A_from = A_from_shuffle[BATCH_SIZE:]
+                        A_to = A_to_shuffle[BATCH_SIZE:]
                         idx_batch = 0
                         yield np.array(S_shuffle[:BATCH_SIZE]), [np.array(A_from_shuffle[:BATCH_SIZE]), np.array(A_to_shuffle[:BATCH_SIZE])]
 
