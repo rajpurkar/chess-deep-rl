@@ -13,7 +13,7 @@ NUM_SQUARES = len(chess.SQUARE_NAMES)
 NUM_COLS = 8
 NUM_ROWS = 8
 BATCH_SIZE = 32
-POOL_SIZE = 32
+POOL_SIZE = 256
 
 GAMMA = 0.99
 
@@ -238,7 +238,7 @@ class Dataset:
         Y1 = []
         Y2 = []
         print("Pickling data:")
-        for x, y in tqdm(getattr(self, generator)(featurized=True, loop=False)):
+        for x, y in tqdm(getattr(self, generator)(featurized=featurized, loop=False)):
             X.append(x)
             if type(y) is list:
                 Y1.append(y[0])
@@ -572,6 +572,73 @@ class Dataset:
                         A_to = []
                         idx_batch = 0
                         yield np.array(S_shuffle), [np.array(A_from_shuffle), np.array(A_to_shuffle)]
+
+    def state_value(self, loop=True, featurized=False):
+        """
+        Returns (state, action) tuple from white's perspective - flips black's perspective to match
+        - state: np.array [12 pieces x 64 squares]
+            - piece order:  wp wn wb wr wq wk bp bn bb br bq bk
+            - square order: a1 b1 c1 ... h8
+        - action: [np.array [1 x 64 squares], np.array [1 x 64 squares]] representing [from_board, to_board]
+        """
+        idx_batch = 0
+        with open(self.filename) as pgn:
+            S = []
+            R = []
+            while True:
+                game = chess.pgn.read_game(pgn)
+                if game is None:
+                    if not loop:
+                        break
+                    print("\n******************************************")
+                    print("********** LOOPING OVER DATASET **********")
+                    print("******************************************\n")
+                    pgn.seek(0)
+                    continue
+
+                num_moves = int(game.headers["PlyCount"])
+                board = game.board()
+                node = game.root()
+
+                if num_moves <= 4:
+                    continue
+
+                # Make sure game was played all the way through
+                last_node = game.root()
+                while last_node.variations:
+                    last_node = last_node.variations[0]
+                if "forfeit" in last_node.comment:
+                    continue
+
+                z = 0
+                white_score = game.headers["Result"].split("-")[0].split("/")
+                if len(white_score) == 1:
+                    z = 2 * int(white_score[0]) - 1
+
+                black_turn = False
+                while node.variations:
+                    # Play white
+                    s = state_from_board(board, featurized=featurized, black=black_turn)
+                    move = node.variations[0].move
+                    r = z if not black_turn else -z
+                    board.push(move)
+                    black_turn = not black_turn
+
+                    node = node.variations[0]
+
+                    S.append(s)
+                    R.append(r)
+                    idx_batch += 1
+
+                    if idx_batch >= BATCH_SIZE and len(S) >= POOL_SIZE:
+                        # Shuffle moves in game
+                        idx = list(np.random.permutation(len(S)))
+                        S_shuffle = [S[i] for i in idx]
+                        R_shuffle = [R[i] for i in idx]
+                        S = S_shuffle[BATCH_SIZE:]
+                        R = R_shuffle[BATCH_SIZE:]
+                        idx_batch = 0
+                        yield np.array(S_shuffle[:BATCH_SIZE]), np.array(R_shuffle[:BATCH_SIZE])
 
     def random_white_state(self):
         """

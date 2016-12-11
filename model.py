@@ -21,11 +21,11 @@ def build_network(**kwargs):
 
     defaults = {
         "board_side_length": 8,
-        "conv_layers": 3,
+        "conv_layers": 4,
         "num_filters": 32,
-        "dropout": 0.4,
-        "dense_layers": 4,
-        "dense_hidden": 128,
+        "dropout": 0.3,
+        "dense_layers": 2,
+        "dense_hidden": 64,
         "output_size": 64,
         "conditioned_architecture": True
     }
@@ -132,7 +132,10 @@ def train(net_type):
         featurized=featurized,
         refresh=False)
     model = build_network(board_num_channels=X_val[0].shape[0])
-    plot_model(model, start_time)
+    try:
+        plot_model(model, start_time)
+    except:
+        print("Skipping plot")
     from keras.callbacks import ModelCheckpoint
     checkpointer = ModelCheckpoint(
         filepath=get_filename_for_saving(start_time),
