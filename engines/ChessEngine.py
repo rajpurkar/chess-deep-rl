@@ -2,6 +2,7 @@
 import chess
 import sys
 import os
+import random
 import traceback
 from concurrent import futures
 
@@ -11,6 +12,8 @@ class ChessEngine:
         self.author = "P. Rajpurkar & T. Migimatsu"
         self.board = chess.Board()
         self.thread_pool = futures.ThreadPoolExecutor(max_workers=2)
+        self.is_black = False
+        self.new_game = True
 
     ###################
     # Virtual methods #
@@ -19,12 +22,11 @@ class ChessEngine:
         """
         Find two best moves
         """
-        moves_generator = self.board.generate_legal_moves()
-        self.moves = []
-        for i, move in enumerate(moves_generator):
-            if i == 2:
-                break
-            self.moves.append(move)
+        legal_moves = list(self.board.generate_legal_moves())
+        if legal_moves:
+            self.moves = [random.choice(legal_moves)]
+        else:
+            self.moves = None
 
     def ponder(self):
         """
@@ -59,11 +61,19 @@ class ChessEngine:
         print("readyok")
 
     def ucinewgame(self):
-        self.board.reset_board()
+        self.new_game = True
+        self.board = chess.Board()
 
     def position(self, input_tokens):
         # Play through last two moves on internal board, regardless of given position
         try:
+            if self.new_game:
+                if len(input_tokens) == 1:
+                    self.is_black = False
+                else:
+                    self.is_black = True
+                self.new_game = False
+
             if input_tokens[0] == "startpos" and input_tokens[1] == "moves":
                 moves = input_tokens[2:]
             elif input_tokens[0] == "fen" and "moves" in input_tokens:
@@ -88,9 +98,9 @@ class ChessEngine:
             self.search_options["searchmoves"] = input_tokens[1:]
         elif input_tokens[0] == "ponder":
             # Start searching in pondering move. Do not exit the search in ponder
-            # mode, even if it’s mate! This means that the last move sent in in the
-            # position string is the ponder move.The engine can do what it wants to
-            # do, but after a “ponderhit” command it should execute the suggested
+            # mode, even if it's mate! This means that the last move sent in the
+            # position string is the ponder move. The engine can do what it wants to
+            # do, but after a "ponderhit" command it should execute the suggested
             # move to ponder on.
             ponder()
         elif input_tokens[0] in ["movetime", "infinite", "wtime", "btime", \
@@ -100,15 +110,15 @@ class ChessEngine:
             # winc: White increment per move in mseconds if x > 0
             # binc: Black increment per move in mseconds if x > 0
             # movestogo: Here are x moves to the next time control, this will
-            #     only be sent if x > 0, if you don’t get this and get the wtime and
-            #     btime it’s sudden death
+            #     only be sent if x > 0, if you don't get this and get the wtime and
+            #     btime it's sudden death
             # depth: Search x plies only
             # nodes: Search x nodes only
             # mate: Search for a mate in x moves
             # movetime: Search exactly x mseconds
             self.search_options[input_tokens[0]] = int(input_tokens[1])
         elif input_tokens[0] == "infinite":
-            # Search until the “stop” command. Do not exit the search without being
+            # Search until the "stop" command. Do not exit the search without being
             # told so in this mode!
             self.search_options["infinite"] = True
 
