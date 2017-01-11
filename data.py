@@ -234,38 +234,54 @@ class Dataset:
         return X_y
 
     def pickle(self, generator, featurized, board):
-        X = []
+        X1 = []
+        X2 = []
         Y1 = []
         Y2 = []
         print("Pickling data:")
         for x, y in tqdm(getattr(self, generator)(loop=False, featurized=featurized, board=board)):
-            X.append(x)
+            if type(x) is list:
+                X1.append(x[0])
+                X2.append(x[1])
+            else:
+                X1.append(x)
             if type(y) is list:
                 Y1.append(y[0])
                 Y2.append(y[1])
             else:
                 Y1.append(y)
 
-        X = np.concatenate(X)
-        np.save(self.filename + "." + generator + "-" + str(featurized) + "-" + board + "-X.npy", X)
+        X1 = np.concatenate(X1)
+        np.save(self.filename + "." + generator + "-" + str(featurized) + "-" + board + "-X.npy", X1)
+
+        if not not X2:
+            X2 = np.concatenate(X2)
+            np.save(self.filename + "." + generator + "-" + str(featurized) + "-" + board + "-x2.npy", X2)
 
         Y1 = np.concatenate(Y1)
         np.save(self.filename + "." + generator + "-" + str(featurized) + "-" + board + "-y.npy", Y1)
         if not Y2:
-            return X, Y1
+            if type(x) is not list:
+                return X1, Y1
+            else:
+                return [X1, X2], Y1
 
         Y2 = np.concatenate(Y2)
         np.save(self.filename + "." + generator + "-" + str(featurized) + "-" + board + "-y2.npy", Y2)
-        return X, Y1, Y2
+        return X1, Y1, Y2
 
     def unpickle(self, generator, featurized):
-        X = np.load(self.filename + "." + generator + "-" + str(featurized) + "-" + board + "-X.npy")
+        X1 = np.load(self.filename + "." + generator + "-" + str(featurized) + "-" + board + "-X.npy")
         Y1 = np.load(self.filename + "." + generator + "-" + str(featurized) + "-" + board + "-y.npy")
         try:
             Y2 = np.load(self.filename + "." + generator + "-" + str(featurized) + "-" + board + "-y2.npy")
         except:
-            return X, Y1
-        return X, Y1, Y2
+            try:
+                X2 = np.load(self.filename + "." + generator + "-" + str(featurized) + "-" + board + "-x2.npy")
+            except:
+                return X1, Y1
+            return [X1, X2], Y1
+        return X1, Y1, Y2
 
     def white_sarsa(self):
         return self.sarsa(black=False)
