@@ -380,12 +380,15 @@ class Dataset:
             from_board = True
         elif board == "to":
             to_board = True
+        elif board == "combined":
+            pass
 
         idx_batch = 0
         with open(self.filename) as pgn:
             S = []
             A_from = []
             A_to = []
+            A_combined = []
             while True:
                 game = chess.pgn.read_game(pgn)
                 if game is None:
@@ -425,6 +428,9 @@ class Dataset:
                     S.append(s)
                     A_from.append(a_from)
                     A_to.append(a_to)
+                    if not (from_board or to_board):
+                        a_combined = np.outer(a_from, a_to).reshape(NUM_ROWS,NUM_COLS,NUM_ROWS,NUM_COLS)
+                        A_combined.append(a_combined)
                     idx_batch += 1
 
                     if idx_batch >= BATCH_SIZE and len(S) >= POOL_SIZE:
@@ -436,6 +442,9 @@ class Dataset:
                         S = S_shuffle[BATCH_SIZE:]
                         A_from = A_from_shuffle[BATCH_SIZE:]
                         A_to = A_to_shuffle[BATCH_SIZE:]
+                        if not not A_combined:
+                            A_combined_shuffle = [A_combined[i] for i in idx]
+                            A_combined = A_combined_shuffle[BATCH_SIZE:]
                         idx_batch = 0
                         if from_board and to_board:
                             yield (np.array(S_shuffle[:BATCH_SIZE]), \
@@ -448,6 +457,10 @@ class Dataset:
                             yield ([np.array(S_shuffle[:BATCH_SIZE]), \
                                     np.array(A_from_shuffle[:BATCH_SIZE]).reshape(BATCH_SIZE,1,NUM_ROWS,NUM_COLS)], \
                                    np.array(A_to_shuffle[:BATCH_SIZE]))
+                        else:
+                            yield (np.array(S_shuffle[:BATCH_SIZE]), \
+                                   np.array(A_combined_shuffle[:BATCH_SIZE]))
+
 
     def white_phi_action_sl(self, loop=False):
         return self.white_state_action_sl(loop=loop, featurized=True)
