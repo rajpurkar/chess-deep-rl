@@ -122,10 +122,24 @@ def train(net_type):
     else assert('Network type not recognized')
     d_test = Dataset('data/large-ccrl_test.pgn')
     featurized = True
+    # Combined boards
     X_val, y_from_val, y_to_val = d_test.load(
         generator_fn.__name__,
         featurized=featurized,
-        refresh=False)
+        refresh=False,
+        board="both")
+    # From board
+    X_val, y_from_val = d_test.load(
+        generator_fn.__name__,
+        featurized=featurized,
+        refresh=False,
+        board="from")
+    # To board
+    X_val, y_to_val = d_test.load(
+        generator_fn.__name__,
+        featurized=featurized,
+        refresh=False,
+        board="to")
     model = build_network(board_num_channels=X_val[0].shape[0], net_type=net_type)
     try:
         plot_model(model, start_time, net_type)
