@@ -1,4 +1,4 @@
-import m as util
+import util
 
 def build_network(**kwargs):
     from keras.models import Model
@@ -12,7 +12,6 @@ def build_network(**kwargs):
         "dense_layers": 2,
         "dense_hidden": 64,
         "output_size": 64,
-        "conditioned_architecture": True
     }
     params = defaults
     params.update(kwargs)
@@ -24,32 +23,20 @@ def build_network(**kwargs):
 
     conv_out = conv_input
     for i in range(0, params["conv_layers"]):
-        conv_out = util.conv_wrap(conv_out)
+        conv_out = util.conv_wrap(params, conv_out, i)
 
     flattened = Flatten()(conv_out)
 
     dense_out = flattened
+
     for i in range(params["dense_layers"]):
-        dense_out = util.dense_wrap(dense_out)
+        dense_out = util.dense_wrap(params, dense_out, i)
     output_from = Dense(params["output_size"], activation="softmax", name='from_board')(dense_out)
 
-    if params["conditioned_architecture"] is True:
-        output_reshaped = Reshape((1, 8, 8))(output_from)
-        conv_merged = merge(
-            [output_reshaped, conv_input],
-            mode='concat',
-            concat_axis=1)
-
-        conv_out_2 = conv_merged
-        for i in range(0, params["conv_layers"]):
-            conv_out_2 = util.conv_wrap(conv_out_2)
-        flattened2 = Flatten()(conv_out_2)
-        dense_out_2 = flattened2
-    else:
-        dense_out_2 = flattened
+    dense_out_2 = flattened
 
     for i in range(params["dense_layers"]):
-        dense_out_2 = util.dense_wrap(dense_out_2)
+        dense_out_2 = util.dense_wrap(params, dense_out_2, i)
     output_to = Dense(params["output_size"], activation="softmax", name="to_board")(dense_out_2)
 
     model = Model(conv_input, [output_from, output_to])
@@ -60,4 +47,4 @@ def build_network(**kwargs):
     return model
 
 if __name__ == '__main__':
-    util.train('policy', 'state_action_sl', 'data/large-ccrl_', build_network, featurized=True)
+    util.train('both', 'state_action_sl', 'data/large-ccrl_', build_network, featurized=True)

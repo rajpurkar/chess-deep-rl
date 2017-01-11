@@ -76,7 +76,7 @@ def train(net_type, generator_fn_str, dataset_file, build_net_fn, featurized=Tru
         featurized = featurized,
         refresh    = False)
 
-    model = build_net_fn(board_num_channels=X_val[0].shape[0])
+    model = build_net_fn(board_num_channels=X_val[0].shape[0], net_type=net_type)
     start_time = str(int(time.time()))
     try:
         plot_model(model, start_time, net_type)
@@ -88,7 +88,7 @@ def train(net_type, generator_fn_str, dataset_file, build_net_fn, featurized=Tru
         verbose        = 2,
         save_best_only = True)
 
-    model.fit_generator(generator_fn(featurized=featurized),
+    model.fit_generator(generator_fn(featurized=featurized, board=net_type),
         samples_per_epoch = SAMPLES_PER_EPOCH,
         nb_epoch          = NUMBER_EPOCHS,
         callbacks         = [checkpointer],
