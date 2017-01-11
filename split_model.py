@@ -127,7 +127,7 @@ def train(net_type):
         refresh=False,
         board=net_type)
 
-    model = build_network(board_num_channels=X_val[0].shape[0], net_type=net_type)
+    model = build_network(board_num_channels=27, net_type=net_type)
     try:
         plot_model(model, start_time, net_type)
     except:

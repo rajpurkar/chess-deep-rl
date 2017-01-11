@@ -446,7 +446,7 @@ class Dataset:
                                    np.array(A_from_shuffle[:BATCH_SIZE]))
                         elif to_board:
                             yield ([np.array(S_shuffle[:BATCH_SIZE]), \
-                                    np.array(A_from_shuffle[:BATCH_SIZE]).reshape(BATCH_SIZE,NUM_ROWS,NUM_COLS)], \
+                                    np.array(A_from_shuffle[:BATCH_SIZE]).reshape(BATCH_SIZE, 1, NUM_ROWS,NUM_COLS)], \
                                    np.array(A_to_shuffle[:BATCH_SIZE]))
 
     def white_phi_action_sl(self, loop=False):
