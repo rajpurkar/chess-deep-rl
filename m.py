@@ -1,14 +1,26 @@
-import time
 import os
-import argparse
-from data import Dataset
-import numpy as np
-np.random.seed(20)
-
 FOLDER_TO_SAVE = "./saved/"
-NUMBER_EPOCHS = 10000  # some large number
-SAMPLES_PER_EPOCH = 12800  # tune for feedback/speed balance
-VERBOSE_LEVEL = 1
+
+def get_folder_name(start_time, net_type):
+    folder_name = FOLDER_TO_SAVE + net_type + '/' + start_time
+    if not os.path.exists(folder_name):
+        os.makedirs(folder_name)
+    return folder_name
+
+
+def get_filename_for_saving(start_time, net_type):
+    saved_filename = get_folder_name(start_time, net_type) + "/{epoch:02d}-{val_loss:.2f}.hdf5"
+    return saved_filename
+
+
+def plot_model(model, start_time, net_type):
+    from keras.utils.visualize_util import plot
+    plot(
+        model,
+        to_file=get_folder_name(start_time, net_type) + '/model.png',
+        show_shapes=True,
+        show_layer_names=False)
+
 
 def build_network(**kwargs):
     from keras.models import Model
@@ -76,58 +88,3 @@ def build_network(**kwargs):
 
     model.compile('adamax', 'mse', metrics=['mean_squared_error', 'mean_absolute_error'])
     return model
-
-
-def get_folder_name(start_time):
-    folder_name = FOLDER_TO_SAVE + 'value/' + start_time
-    if not os.path.exists(folder_name):
-        os.makedirs(folder_name)
-    return folder_name
-
-
-def get_filename_for_saving(start_time):
-    saved_filename = get_folder_name(start_time) + "/{epoch:02d}-{val_loss:.2f}.hdf5"
-    return saved_filename
-
-
-def plot_model(model, start_time):
-    from keras.utils.visualize_util import plot
-    plot(
-        model,
-        to_file=get_folder_name(start_time) + '/model.png',
-        show_shapes=True,
-        show_layer_names=False)
-
-
-def train():
-    featurized = True
-
-    d = Dataset('data/large-ccrl_train.pgn')
-    generator_fn = d.state_value
-
-    d_test = Dataset('data/large-ccrl_test.pgn')
-    X_val, y_val = d_test.load('state_value',
-        featurized = featurized,
-        refresh    = False)
-
-    model = build_network(board_num_channels=X_val[0].shape[0])
-    start_time = str(int(time.time()))
-    try:
-        plot_model(model, start_time)
-    except:
-        print("Skipping plot")
-    from keras.callbacks import ModelCheckpoint
-    checkpointer = ModelCheckpoint(
-        filepath       = get_filename_for_saving(start_time),
-        verbose        = 2,
-        save_best_only = True)
-
-    model.fit_generator(generator_fn(featurized=featurized),
-        samples_per_epoch = SAMPLES_PER_EPOCH,
-        nb_epoch          = NUMBER_EPOCHS,
-        callbacks         = [checkpointer],
-        validation_data   = (X_val, y_val),
-        verbose           = VERBOSE_LEVEL)
-
-if __name__ == '__main__':
-    train()
