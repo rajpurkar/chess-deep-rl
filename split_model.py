@@ -35,7 +35,7 @@ def build_network(**kwargs):
         params["board_side_length"],
         params["board_side_length"]))
 
-    if net_type == 'to':
+    if params["net_type"] == 'to':
         from_input = Input(shape=(1,
         params["board_side_length"],
         params["board_side_length"]))
@@ -114,32 +114,19 @@ def plot_model(model, start_time, net_type):
 
 
 def train(net_type):
-    d = Dataset('data/large-ccrl_train.pgn')
+    assert(net_type == 'from' or net_type == 'to')
+    d = Dataset('data/medium_train.pgn')
     start_time = str(int(time.time()))
-    if net_type == 'from':
-        generator_fn = #
-    else if net_type == 'to':
-    else assert('Network type not recognized')
-    d_test = Dataset('data/large-ccrl_test.pgn')
+    generator_fn = d.state_action_sl
+    print(generator_fn.__name__)
+    d_test = Dataset('data/medium_test.pgn')
     featurized = True
-    # Combined boards
-    X_val, y_from_val, y_to_val = d_test.load(
+    X_val, y_val = d_test.load(
         generator_fn.__name__,
         featurized=featurized,
         refresh=False,
-        board="both")
-    # From board
-    X_val, y_from_val = d_test.load(
-        generator_fn.__name__,
-        featurized=featurized,
-        refresh=False,
-        board="from")
-    # To board
-    X_val, y_to_val = d_test.load(
-        generator_fn.__name__,
-        featurized=featurized,
-        refresh=False,
-        board="to")
+        board=net_type)
+
     model = build_network(board_num_channels=X_val[0].shape[0], net_type=net_type)
     try:
         plot_model(model, start_time, net_type)
@@ -155,7 +142,7 @@ def train(net_type):
         samples_per_epoch=SAMPLES_PER_EPOCH,
         nb_epoch=NUMBER_EPOCHS,
         callbacks=[checkpointer],
-        validation_data=(X_val, [y_from_val, y_to_val]),
+        validation_data=(X_val, y_val),
         verbose=VERBOSE_LEVEL)
 
 if __name__ == '__main__':
