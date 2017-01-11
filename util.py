@@ -74,9 +74,11 @@ def train(net_type, generator_fn_str, dataset_file, build_net_fn, featurized=Tru
 
     X_val, y_val = d_test.load(generator_fn.__name__,
         featurized = featurized,
-        refresh    = False)
+        refresh    = False,
+        board = net_type)
 
-    model = build_net_fn(board_num_channels=X_val[0].shape[0], net_type=net_type)
+    board_num_channels = X_val[0].shape[1] if net_type == 'to' else X_val[0].shape[0]
+    model = build_net_fn(board_num_channels=board_num_channels, net_type=net_type)
     start_time = str(int(time.time()))
     try:
         plot_model(model, start_time, net_type)
