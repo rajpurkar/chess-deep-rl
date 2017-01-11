@@ -138,7 +138,7 @@ def train(net_type):
         verbose=VERBOSE_LEVEL,
         save_best_only=True)
     model.fit_generator(
-        generator_fn(featurized=featurized),
+        generator_fn(featurized=featurized, board=net_type),
         samples_per_epoch=SAMPLES_PER_EPOCH,
         nb_epoch=NUMBER_EPOCHS,
         callbacks=[checkpointer],
