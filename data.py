@@ -606,7 +606,7 @@ class Dataset:
                         idx_batch = 0
                         yield np.array(S_shuffle), [np.array(A_from_shuffle), np.array(A_to_shuffle)]
 
-    def state_value(self, loop=True, featurized=False):
+    def state_value(self, loop=True, featurized=False, board='both'):
         """
         Returns (state, action) tuple from white's perspective - flips black's perspective to match
         - state: np.array [12 pieces x 64 squares]
