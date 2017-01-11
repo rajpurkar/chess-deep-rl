@@ -270,7 +270,7 @@ class Dataset:
         np.save(self.filename + "." + generator + "-" + str(featurized) + "-" + board + "-y2.npy", Y2)
         return X1, Y1, Y2
 
-    def unpickle(self, generator, featurized):
+    def unpickle(self, generator, featurized, board):
         X1 = np.load(self.filename + "." + generator + "-" + str(featurized) + "-" + board + "-X.npy")
         Y1 = np.load(self.filename + "." + generator + "-" + str(featurized) + "-" + board + "-y.npy")
         try:
@@ -446,7 +446,7 @@ class Dataset:
                                    np.array(A_from_shuffle[:BATCH_SIZE]))
                         elif to_board:
                             yield ([np.array(S_shuffle[:BATCH_SIZE]), \
-                                    np.array(A_from_shuffle[:BATCH_SIZE]).reshape(BATCH_SIZE,NUM_ROWS,NUM_COLS)], \
+                                    np.array(A_from_shuffle[:BATCH_SIZE]).reshape(BATCH_SIZE,1,NUM_ROWS,NUM_COLS)], \
                                    np.array(A_to_shuffle[:BATCH_SIZE]))
 
     def white_phi_action_sl(self, loop=False):
