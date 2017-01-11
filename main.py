@@ -9,9 +9,12 @@ d = Dataset("data/small.pgn")
 # d = Dataset("data/medium.pgn")
 # d = Dataset("data/CCRL-4040.[671444].pgn")
 # d = Dataset("data/ficsgamesdb_1999-2015_standard2000_nomovetimes.pgn")
+d_test = Dataset('data/strategic_test_suite/STS1.epd')
+X_val, y_val = d_test.load_sts(featurized=True, board_type="to")
+print(X_val[0].shape, X_val[1].shape, y_val.shape)
 
-for s, a_from in d.state_action_sl(loop=False, board="to"):
-    print(s[1].shape, np.array(a_from).shape)
+#  for s, a_from in d.state_action_sl(loop=False, board="to"):
+#      print(s[1].shape, np.array(a_from).shape)
 exit()
 # for state, reward in d.random_black_state():
 #     print(state.shape, reward)
