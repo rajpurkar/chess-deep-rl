@@ -380,7 +380,7 @@ class Dataset:
             from_board = True
         elif board == "to":
             to_board = True
-        elif board == "combined":
+        elif board == "full":
             pass
 
         idx_batch = 0
