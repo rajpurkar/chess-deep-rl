@@ -10,6 +10,9 @@ d = Dataset("data/small.pgn")
 # d = Dataset("data/CCRL-4040.[671444].pgn")
 # d = Dataset("data/ficsgamesdb_1999-2015_standard2000_nomovetimes.pgn")
 
+for s, a_from in d.state_action_sl(loop=False, board="to"):
+    print(s[1].shape, np.array(a_from).shape)
+exit()
 # for state, reward in d.random_black_state():
 #     print(state.shape, reward)
 

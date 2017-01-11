@@ -221,24 +221,24 @@ class Dataset:
         self.num_games = 0
         # self.idx_moves = []
 
-    def load(self, generator, featurized=True, refresh=False):
+    def load(self, generator, featurized=True, refresh=False, board="both"):
         assert(type(generator) == str)
 
         if refresh:
-            return self.pickle(generator, featurized=featurized)
+            return self.pickle(generator, featurized=featurized, board=board)
 
         try:
-            X_y = self.unpickle(generator, featurized=featurized)
+            X_y = self.unpickle(generator, featurized=featurized, board=board)
         except:
-            X_y = self.pickle(generator, featurized=featurized)
+            X_y = self.pickle(generator, featurized=featurized, board=board)
         return X_y
 
-    def pickle(self, generator, featurized):
+    def pickle(self, generator, featurized, board):
         X = []
         Y1 = []
         Y2 = []
         print("Pickling data:")
-        for x, y in tqdm(getattr(self, generator)(featurized=featurized, loop=False)):
+        for x, y in tqdm(getattr(self, generator)(loop=False, featurized=featurized, board=board)):
             X.append(x)
             if type(y) is list:
                 Y1.append(y[0])
@@ -247,22 +247,22 @@ class Dataset:
                 Y1.append(y)
 
         X = np.concatenate(X)
-        np.save(self.filename + "." + generator + "-" + str(featurized) + "-X.npy", X)
+        np.save(self.filename + "." + generator + "-" + str(featurized) + "-" + board + "-X.npy", X)
 
         Y1 = np.concatenate(Y1)
-        np.save(self.filename + "." + generator + "-" + str(featurized) + "-y.npy", Y1)
+        np.save(self.filename + "." + generator + "-" + str(featurized) + "-" + board + "-y.npy", Y1)
         if not Y2:
             return X, Y1
 
         Y2 = np.concatenate(Y2)
-        np.save(self.filename + "." + generator + "-" + str(featurized) + "-y2.npy", Y2)
+        np.save(self.filename + "." + generator + "-" + str(featurized) + "-" + board + "-y2.npy", Y2)
         return X, Y1, Y2
 
     def unpickle(self, generator, featurized):
-        X = np.load(self.filename + "." + generator + "-" + str(featurized) + "-X.npy")
-        Y1 = np.load(self.filename + "." + generator + "-" + str(featurized) + "-y.npy")
+        X = np.load(self.filename + "." + generator + "-" + str(featurized) + "-" + board + "-X.npy")
+        Y1 = np.load(self.filename + "." + generator + "-" + str(featurized) + "-" + board + "-y.npy")
         try:
-            Y2 = np.load(self.filename + "." + generator + "-" + str(featurized) + "-y2.npy")
+            Y2 = np.load(self.filename + "." + generator + "-" + str(featurized) + "-" + board + "-y2.npy")
         except:
             return X, Y1
         return X, Y1, Y2
@@ -347,10 +347,7 @@ class Dataset:
 
                 yield s, a, r, s_prime, a_prime, new_game
 
-    def phi_action_sl(self, loop=False):
-        return self.state_action_sl(loop=loop, featurized=True)
-
-    def state_action_sl(self, loop=True, featurized=False):
+    def state_action_sl(self, loop=True, featurized=False, board="both"):
         """
         Returns (state, action) tuple from white's perspective - flips black's perspective to match
         - state: np.array [12 pieces x 64 squares]
@@ -358,6 +355,16 @@ class Dataset:
             - square order: a1 b1 c1 ... h8
         - action: [np.array [1 x 64 squares], np.array [1 x 64 squares]] representing [from_board, to_board]
         """
+        from_board = False
+        to_board = False
+        if board == "both":
+            from_board = True
+            to_board = True
+        elif board == "from":
+            from_board = True
+        elif board == "to":
+            to_board = True
+
         idx_batch = 0
         with open(self.filename) as pgn:
             S = []
@@ -414,7 +421,17 @@ class Dataset:
                         A_from = A_from_shuffle[BATCH_SIZE:]
                         A_to = A_to_shuffle[BATCH_SIZE:]
                         idx_batch = 0
-                        yield np.array(S_shuffle[:BATCH_SIZE]), [np.array(A_from_shuffle[:BATCH_SIZE]), np.array(A_to_shuffle[:BATCH_SIZE])]
+                        if from_board and to_board:
+                            yield (np.array(S_shuffle[:BATCH_SIZE]), \
+                                   [np.array(A_from_shuffle[:BATCH_SIZE]), \
+                                    np.array(A_to_shuffle[:BATCH_SIZE])])
+                        elif from_board:
+                            yield (np.array(S_shuffle[:BATCH_SIZE]), \
+                                   np.array(A_from_shuffle[:BATCH_SIZE]))
+                        elif to_board:
+                            yield ([np.array(S_shuffle[:BATCH_SIZE]), \
+                                    np.array(A_from_shuffle[:BATCH_SIZE]).reshape(BATCH_SIZE,NUM_ROWS,NUM_COLS)], \
+                                   np.array(A_to_shuffle[:BATCH_SIZE]))
 
     def white_phi_action_sl(self, loop=False):
         return self.white_state_action_sl(loop=loop, featurized=True)
