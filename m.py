@@ -22,13 +22,44 @@ def plot_model(model, start_time, net_type):
         show_layer_names=False)
 
 
-def build_network(**kwargs):
-    from keras.models import Model
-    from keras.layers.convolutional import Convolution2D
+def conv_wrap(params, conv_out, i):
     from keras.layers.normalization import BatchNormalization
     from keras.layers.advanced_activations import PReLU
-    from keras.layers import Dense, Dropout, Activation, \
-        Reshape, Flatten, Input, merge
+    from keras.layers.convolutional import Convolution2D
+    from keras.layers import Dropout
+    
+    # use filter_width_K if it is there, otherwise use 3
+    filter_key = "filter_width_%d" % i
+    filter_width = params.get(filter_key, 3)
+    num_filters = params["num_filters"]
+    conv_out = Convolution2D(
+        nb_filter=num_filters,
+        nb_row=filter_width,
+        nb_col=filter_width,
+        init='he_normal',
+        border_mode='same')(conv_out)
+    conv_out = BatchNormalization()(conv_out)
+    conv_out = PReLU()(conv_out)
+    if params["dropout"] > 0:
+        conv_out = Dropout(params["dropout"])(conv_out)
+    return conv_out
+
+def dense_wrap(params, dense_out, i):
+    from keras.layers.normalization import BatchNormalization
+    from keras.layers.advanced_activations import PReLU
+    from keras.layers import Dense, Dropout
+
+    dense_out = Dense(params["dense_hidden"],
+                      init="he_normal")(dense_out)
+    dense_out = BatchNormalization()(dense_out)
+    dense_out = PReLU()(dense_out)
+    if params["dropout"] > 0:
+        dense_out = Dropout(params["dropout"])(dense_out)
+    return dense_out
+
+def build_network(**kwargs):
+    from keras.models import Model
+    from keras.layers import Dense, Activation, Reshape, Flatten, Input, merge
 
     defaults = {
         "board_side_length": 8,
@@ -47,41 +78,15 @@ def build_network(**kwargs):
         params["board_side_length"],
         params["board_side_length"]))
 
-    def conv_wrap(conv_out):
-        # use filter_width_K if it is there, otherwise use 3
-        filter_key = "filter_width_%d" % i
-        filter_width = params.get(filter_key, 3)
-        num_filters = params["num_filters"]
-        conv_out = Convolution2D(
-            nb_filter=num_filters,
-            nb_row=filter_width,
-            nb_col=filter_width,
-            init='he_normal',
-            border_mode='same')(conv_out)
-        conv_out = BatchNormalization()(conv_out)
-        conv_out = PReLU()(conv_out)
-        if params["dropout"] > 0:
-            conv_out = Dropout(params["dropout"])(conv_out)
-        return conv_out
-
-    def dense_wrap(dense_out):
-        dense_out = Dense(params["dense_hidden"],
-                          init="he_normal")(dense_out)
-        dense_out = BatchNormalization()(dense_out)
-        dense_out = PReLU()(dense_out)
-        if params["dropout"] > 0:
-            dense_out = Dropout(params["dropout"])(dense_out)
-        return dense_out
-
     conv_out = conv_input
     for i in range(0, params["conv_layers"]):
-        conv_out = conv_wrap(conv_out)
+        conv_out = conv_wrap(params, conv_out, i)
 
     flattened = Flatten()(conv_out)
 
     dense_out = flattened
     for i in range(params["dense_layers"]):
-        dense_out = dense_wrap(dense_out)
+        dense_out = dense_wrap(params, dense_out, i)
     value = Dense(params["output_size"], activation="tanh", name='value')(dense_out)
 
     model = Model(conv_input, value)

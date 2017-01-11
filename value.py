@@ -10,8 +10,7 @@ NUMBER_EPOCHS = 10000  # some large number
 SAMPLES_PER_EPOCH = 12800  # tune for feedback/speed balance
 VERBOSE_LEVEL = 1
 
-def inside(generator_fn_str, dataset_file, featurized):
-    net_type = 'value'
+def inside(net_type, generator_fn_str, dataset_file, build_net_fn, featurized=True):
     d = Dataset(dataset_file + 'train.pgn')
     generator_fn = getattr(d, generator_fn_str)
     d_test = Dataset(dataset_file + 'test.pgn')
@@ -20,7 +19,7 @@ def inside(generator_fn_str, dataset_file, featurized):
         featurized = featurized,
         refresh    = False)
 
-    model = m.build_network(board_num_channels=X_val[0].shape[0])
+    model = build_net_fn(board_num_channels=X_val[0].shape[0])
     start_time = str(int(time.time()))
     try:
         m.plot_model(model, start_time, net_type)
@@ -40,4 +39,4 @@ def inside(generator_fn_str, dataset_file, featurized):
         verbose           = VERBOSE_LEVEL)
 
 if __name__ == '__main__':
-    inside('state_value', 'data/large-ccrl_', True)
+    inside('value', 'state_value', 'data/large-ccrl_', m.build_network, featurized=True)
