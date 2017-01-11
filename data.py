@@ -281,7 +281,7 @@ class Dataset:
             except:
                 return X1, Y1
             return [X1, X2], Y1
-        return X1, Y1, Y2
+        return X1, [Y1, Y2]
 
     def white_sarsa(self):
         return self.sarsa(black=False)
@@ -796,7 +796,7 @@ class Dataset:
                 self.idx_game += 1
                 yield state, reward
 
-    def strategic_test_suite(self):
+    def load_sts(self, featurized=False, board_type="both"):
         """
         Returns (state, action) tuple from white's perspective
         - state: np.array [12 pieces x 64 squares]
@@ -806,8 +806,10 @@ class Dataset:
             - piece type: p n b r q k
         """
         with open(self.filename) as epd:
+            list_scores = []
             S = []
-            A = []
+            A_from = []
+            A_to = []
             for line in epd:
                 # Setup board
                 board = chess.Board()
@@ -825,7 +827,8 @@ class Dataset:
                 max_move = None
                 matches = re.match('c0 "(.*)"$', tokens[2].strip())
                 if matches is not None:
-                    tokens = matches.group(1).split(",")
+                    tokens = re.split(",| ", matches.group(1))
+                    tokens = [token for token in tokens if token]
                     for token in tokens:
                         pair = token.strip().split("=")
                         move = board.parse_san(pair[0])
@@ -837,14 +840,22 @@ class Dataset:
                             max_move = move
 
                 # Convert to state and action representation
-                s = state_from_board(board)
-                (piece_type, from_square, to_square) = action_from_move(max_move)
-                a = np.zeros((NUM_PIECES,))
-                a[piece_type-1] = 1
+                s = state_from_board(board, featurized=featurized, black=False)
+                a_from, a_to = action_from_move(max_move, black=False)
 
+                list_scores.append(scores)
                 S.append(s)
-                A.append(a)
+                A_from.append(a_from)
+                A_to.append(a_to)
 
             S = np.array(S)
-            A = np.array(A)
-            return S, A
+            A_from = np.array(A_from)
+            A_to = np.array(A_to)
+            if board_type == "both":
+                return S, [A_from, A_to]
+            elif board_type == "from":
+                return S, A_from
+            elif board_type == "to":
+                return [S, A_from.reshape(-1,1,NUM_ROWS,NUM_COLS)], A_to
+            else:
+                return list_scores
