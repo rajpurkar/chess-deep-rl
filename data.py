@@ -281,7 +281,7 @@ class Dataset:
             except:
                 return X1, Y1
             return [X1, X2], Y1
-        return X1, Y1, Y2
+        return X1, [Y1, Y2]
 
     def white_sarsa(self):
         return self.sarsa(black=False)
@@ -806,6 +806,7 @@ class Dataset:
             - piece type: p n b r q k
         """
         with open(self.filename) as epd:
+            list_scores = []
             S = []
             A_from = []
             A_to = []
@@ -842,6 +843,7 @@ class Dataset:
                 s = state_from_board(board, featurized=featurized, black=False)
                 a_from, a_to = action_from_move(max_move, black=False)
 
+                list_scores.append(scores)
                 S.append(s)
                 A_from.append(a_from)
                 A_to.append(a_to)
@@ -855,3 +857,5 @@ class Dataset:
                 return S, A_from
             elif board_type == "to":
                 return [S, A_from.reshape(-1,1,NUM_ROWS,NUM_COLS)], A_to
+            else:
+                return list_scores
