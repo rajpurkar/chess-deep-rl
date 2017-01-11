@@ -1,5 +1,14 @@
+import numpy as np
 import os
+import time
+from data import Dataset
+
+np.random.seed(20)
+
 FOLDER_TO_SAVE = "./saved/"
+NUMBER_EPOCHS = 10000  # some large number
+SAMPLES_PER_EPOCH = 12800  # tune for feedback/speed balance
+VERBOSE_LEVEL = 1
 
 def get_folder_name(start_time, net_type):
     folder_name = FOLDER_TO_SAVE + net_type + '/' + start_time
@@ -57,39 +66,31 @@ def dense_wrap(params, dense_out, i):
         dense_out = Dropout(params["dropout"])(dense_out)
     return dense_out
 
-def build_network(**kwargs):
-    from keras.models import Model
-    from keras.layers import Dense, Activation, Reshape, Flatten, Input, merge
 
-    defaults = {
-        "board_side_length": 8,
-        "conv_layers": 4,
-        "num_filters": 32,
-        "dropout": 0.5,
-        "dense_layers": 2,
-        "dense_hidden": 64,
-        "output_size": 1,
-    }
-    params = defaults
-    params.update(kwargs)
+def train(net_type, generator_fn_str, dataset_file, build_net_fn, featurized=True):
+    d = Dataset(dataset_file + 'train.pgn')
+    generator_fn = getattr(d, generator_fn_str)
+    d_test = Dataset(dataset_file + 'test.pgn')
 
-    conv_input = Input(shape=(
-        params["board_num_channels"],
-        params["board_side_length"],
-        params["board_side_length"]))
+    X_val, y_val = d_test.load(generator_fn.__name__,
+        featurized = featurized,
+        refresh    = False)
 
-    conv_out = conv_input
-    for i in range(0, params["conv_layers"]):
-        conv_out = conv_wrap(params, conv_out, i)
+    model = build_net_fn(board_num_channels=X_val[0].shape[0])
+    start_time = str(int(time.time()))
+    try:
+        plot_model(model, start_time, net_type)
+    except:
+        print("Skipping plot")
+    from keras.callbacks import ModelCheckpoint
+    checkpointer = ModelCheckpoint(
+        filepath       = get_filename_for_saving(start_time, net_type),
+        verbose        = 2,
+        save_best_only = True)
 
-    flattened = Flatten()(conv_out)
-
-    dense_out = flattened
-    for i in range(params["dense_layers"]):
-        dense_out = dense_wrap(params, dense_out, i)
-    value = Dense(params["output_size"], activation="tanh", name='value')(dense_out)
-
-    model = Model(conv_input, value)
-
-    model.compile('adamax', 'mse', metrics=['mean_squared_error', 'mean_absolute_error'])
-    return model
+    model.fit_generator(generator_fn(featurized=featurized),
+        samples_per_epoch = SAMPLES_PER_EPOCH,
+        nb_epoch          = NUMBER_EPOCHS,
+        callbacks         = [checkpointer],
+        validation_data   = (X_val, y_val),
+        verbose           = VERBOSE_LEVEL)
