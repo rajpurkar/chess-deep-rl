@@ -429,7 +429,7 @@ class Dataset:
                     A_from.append(a_from)
                     A_to.append(a_to)
                     if not (from_board or to_board):
-                        a_combined = np.outer(a_from, a_to).reshape(NUM_ROWS,NUM_COLS,NUM_ROWS,NUM_COLS)
+                        a_combined = np.outer(a_from, a_to).flatten()
                         A_combined.append(a_combined)
                     idx_batch += 1
 
