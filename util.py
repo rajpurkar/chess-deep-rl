@@ -118,11 +118,11 @@ def validate(model_hdf5, net_type, generator_fn_str, dataset_file, featurized=Tr
         print(num_correct / len(boards))
 
     elif net_type == "to":
-        model_from = load_model("saved/" + model_hdf5)
-        y_hat_from = model_from.predict([X_val, y_val[0].reshape(y_val[0].shape[0],1,X_val.shape[2],X_val.shape[3])])
+        model_to = load_model("saved/" + model_hdf5)
+        y_hat_to = model_to.predict([X_val, y_val[0].reshape(y_val[0].shape[0],1,X_val.shape[2],X_val.shape[3])])
         num_correct = 0
         for i in range(len(boards)):
-            if y_val[1][i,np.argmax(y_hat_from[i])] > 0:
+            if y_val[1][i,np.argmax(y_hat_to[i])] > 0:
                 num_correct += 1
         print(num_correct / len(boards))
 
