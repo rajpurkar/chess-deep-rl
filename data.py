@@ -12,8 +12,8 @@ NUM_COLORS = len(chess.COLORS)
 NUM_SQUARES = len(chess.SQUARE_NAMES)
 NUM_COLS = 8
 NUM_ROWS = 8
-BATCH_SIZE = 32
-POOL_SIZE = 256
+BATCH_SIZE = 4#32
+POOL_SIZE = 4#256
 
 GAMMA = 0.99
 
@@ -213,6 +213,38 @@ def move_from_action(from_square, to_square, black=False):
         from_square, to_square = flip_color_square_idx(from_square, to_square)
     return chess.Move(from_square, to_square)
 
+def board_from_state(state, black=False):
+    if state.ndim == 4:
+        boards = []
+        for i in range(state.shape[0]):
+            board = board_from_state(np.squeeze(state[i,:,:,:]), black=black)
+            boards.append(board)
+        return boards
+
+    flat_board = np.zeros((NUM_ROWS,NUM_COLS), dtype=int)
+    for i in range(12):
+        flat_board += np.squeeze((i+1)*state[i,:,:].astype(int))
+    pieces = ["","P","N","B","R","Q","K","p","n","b","r","q","k"]
+    fen_str = ""
+    for i in reversed(range(NUM_ROWS)):
+        idx_skip = 0
+        for j in range(NUM_COLS):
+            if flat_board[i,j] == 0:
+                idx_skip += 1
+            else:
+                if idx_skip > 0:
+                    fen_str += str(idx_skip)
+                    idx_skip = 0
+                fen_str += pieces[flat_board[i,j]]
+        if idx_skip > 0:
+            fen_str += str(idx_skip)
+            idx_skip = 0
+        fen_str += "/"
+    fen_str = fen_str[:-1] + " "
+    fen_str += "b" if black else "w"
+    fen_str += " KQkq - 0 1"
+    return chess.Board(fen=fen_str)
+
 class Dataset:
     def __init__(self, filename, loop=False):
         self.filename = filename
@@ -268,7 +300,7 @@ class Dataset:
 
         Y2 = np.concatenate(Y2)
         np.save(self.filename + "." + generator + "-" + str(featurized) + "-" + board + "-y2.npy", Y2)
-        return X1, Y1, Y2
+        return X1, [Y1, Y2]
 
     def unpickle(self, generator, featurized, board):
         X1 = np.load(self.filename + "." + generator + "-" + str(featurized) + "-" + board + "-X.npy")
